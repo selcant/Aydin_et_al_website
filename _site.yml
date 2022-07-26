@@ -1,0 +1,58 @@
+name: "Aydin_et_al_website"
+output_dir: "_site"
+exclude: ["renv", "renv.lock", "*.tsv"]
+
+#theme: "theme.css" # darkly from bootswatch.
+navbar:
+  title: "<img id=\"logo\" style=\"width: 110px;\" src=\"logo.jpg\" />"
+  left:
+    - icon: favicon
+    - text: "Overview"
+      href: 01a_overview.html
+    - text: "Pluripotent proteome"
+      menu:
+      - text: "Figure 1"
+        href: 
+      - text: "Figure S1, Tables S1 and S2 "
+        href: 
+      - text: "Figure 2"
+        href: 
+      - text: "Figure S2"
+        href: 
+    - text: "Protein abundance and co-variation"
+      menu:
+      - text: "Figure 3"
+        href: 
+      - text: "Figure S3 and Table S3"
+        href:
+    - text: "Genetic characterization"
+      menu:
+      - text: "Figure 4"
+        href:
+      - text: "Figure S4, Tables S4 and S5"
+    - text: "Multi-omics data integration"
+      menu:
+      - text: "Figure 5"
+        href:
+      - text: "Figure S5 and Table S6"
+        href: 
+      
+  right:
+    - icon: fa-paper-plane
+      href: mailto:<selcan.aydin@jax.org, steven.munger@jax.org>
+  
+  source_url: TRUE
+  
+output: 
+  html_document:
+    code_download: true
+    theme: flatly
+    highlight: textmate
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    includes:
+      #in_header: [include_logo.html]
+      #before_body: include_logo.html
+      after_body: include_footer.html
