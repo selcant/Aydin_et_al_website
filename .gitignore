@@ -5,6 +5,14 @@
 .Rdata
 .httr-oauth
 .DS_Store
-renv
+renv/
 .Rprofile
 .Renviron
+_data
+_site/
+*_files/
+*_cache/
+*.html
+
+
+
