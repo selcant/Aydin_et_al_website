@@ -6,36 +6,24 @@ exclude: ["renv", "renv.lock", "*.tsv"]
 navbar:
   title: "<img id=\"logo\" style=\"width: 110px;\" src=\"logo.jpg\" />"
   left:
-    - icon: favicon
-    - text: "Overview"
-      href: 01a_overview.html
     - text: "Pluripotent proteome"
       menu:
-      - text: "Figure 1"
-        href: 
-      - text: "Figure S1, Tables S1 and S2 "
-        href: 
-      - text: "Figure 2"
-        href: 
-      - text: "Figure S2"
-        href: 
+      - text: "Figure 1, supplemental figures and tables"
+        href: 01a_protein_variation.html
+      - text: "Figure 2, supplemental figures and tables"
+        href: 01b_protein_complexes.html
     - text: "Protein abundance and co-variation"
       menu:
-      - text: "Figure 3"
-        href: 
-      - text: "Figure S3 and Table S3"
-        href:
+      - text: "Figure 3, supplemental figures and tables"
+        href: 02a_covariation.html
     - text: "Genetic characterization"
-      menu:
-      - text: "Figure 4"
-        href:
-      - text: "Figure S4, Tables S4 and S5"
+      menu: 
+      - text: "Figure 4, supplemental figures and tables"
+        href: 03a_genetics.html
     - text: "Multi-omics data integration"
       menu:
-      - text: "Figure 5"
-        href:
-      - text: "Figure S5 and Table S6"
-        href: 
+      - text: "Figure 5, supplemental figures and tables"
+        href: 04a_integration.html
       
   right:
     - icon: fa-paper-plane
