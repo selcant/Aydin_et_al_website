@@ -1,0 +1,24 @@
+---
+title: "Co-variation in protein complex members"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: 
+      collapsed: false
+      smooth_scroll: false
+    df_print: paged
+    code_folding: hide
+---
+
+
+```{r setup}
+
+# options
+options(stringsAsFactors = F)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(progress = FALSE)
+
+```
+
+
