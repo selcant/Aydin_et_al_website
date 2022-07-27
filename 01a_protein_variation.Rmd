@@ -1,5 +1,5 @@
 ---
-title: "Experimental Overview"
+title: "Pluripotent Proteome"
 output:
   html_document:
     toc: true
@@ -39,9 +39,7 @@ library(GenomicRanges)
 #library(ensimplR) # https://github.com/churchill-lab/ensimplR
 library(qvalue)
 library(LOLA)  
-library("simpleCache")
-# library(diffloop)
-library(STRINGdb)
+
 # data processing
 library(pcaMethods) # pca
 library(Hmisc) # rcorr
@@ -49,9 +47,6 @@ library(Hmisc) # rcorr
 library(gprofiler2)
 # library(sva)
 library(WebGestaltR)
-# library(pathVar)
-# library(corto)
-# library(viper)
 library(readxl)
 library(tidyverse)
 select <- dplyr::select # I am adding this explicitly
@@ -334,9 +329,9 @@ shared.probs.esc_prot <- probs.esc_prot[ind = shared.samples]
 shared.probs.esc_rna <- probs.esc_rna[ind = shared.samples]
 # load sample matching table for atac
 # load matching sample names for atac-seq data
-all.ids <- read_tsv(here("_data/Corrected_PBID_SampleMatch_Key_v4.tsv")) %>%
+all.ids <- read_tsv(here("../pQTL_website/_data/Corrected_PBID_SampleMatch_Key_v4.tsv")) %>%
   mutate(sampleid.esc_prot = gsub("rep1", "repA", sampleid.esc_prot))
-correct.atac.ids <- read_tsv(here("_data/ATAC_sampleids_corrected.tsv"))
+correct.atac.ids <- read_tsv(here("../pQTL_website/_data/ATAC_sampleids_corrected.tsv"))
 sample.matches <- correct.atac.ids %>%
   mutate(sampleid = ifelse(endsWith(correct_id, "B"), paste0(correct_id, "_repB"), paste0(correct_id, "_repA"))) %>%
   mutate(sampleid = ifelse(endsWith(correct_id, "C"), paste0(correct_id, "_repC"), sampleid)) %>%
@@ -553,10 +548,7 @@ all.esc.genes <- tibble(mgi_symbol =
 # read in variant definitions
 var.types <- read_xlsx(path = here("../pQTL_website/_data/Variant_Definitions.xlsx")) %>%
   rename(type = `SO term`, score = `Functional consequence score`)
-# pathVar prep
-keg.annots.symbol <- pathVar::makeDBList(here("../pQTL_website/_data/kegg.annots.symbol.txt"))
-keg.annots.prot <- pathVar::makeDBList(here("../pQTL_website/_data/kegg.annots.prot.txt"))
-keg.annots.gene <- pathVar::makeDBList(here("../pQTL_website/_data/kegg.annots.gene.txt"))
+
 bulut.genes <- readxl::read_xlsx(path = here("../pQTL_website/_data/Bulut_2018_TableS6.xlsx")) %>%
   rename(mgi_symbol = OFFICIAL_GENE_SYMBOL) %>%
   select(-Name, -Species) %>%
@@ -568,7 +560,7 @@ bulut.genes <- readxl::read_xlsx(path = here("../pQTL_website/_data/Bulut_2018_T
 # get the ensembl gene ids, they are from december 2011 acc to the table details
 # find most recent versions of the ids using ensembl id converter
 # Requested ID	Matched ID(s)
-genes_2c <- read_xlsx( path = here("_data","Hendrickson_2017_tableS8_2clike_gene_list.xlsx"), sheet = 2) %>% 
+genes_2c <- read_xlsx( path = here("../pQTL_website/_data","Hendrickson_2017_tableS8_2clike_gene_list.xlsx"), sheet = 2) %>% 
   select( ensembl_gene_id_dec2011 = `Requested ID`,	
           ensembl_gene_id = `Matched ID(s)`) %>% 
   left_join( all_annot_v98) %>%
@@ -682,12 +674,12 @@ qtl.colors <- c( rna = "#228833",
 founder_colors <- c(AJ = "#F0E442", B6 = "#555555", `129` = "#E69F00", NOD = "#0072B2",
    NZO = "#56B4E9", CAST = "#009E73", PWK = "#D55E00", WSB = "#CC79A7")
 ## adding cc_variants for association mapping
-query_variants <- create_variant_query_func(here("_data/cc_variants.sqlite"))
-query_genes <- create_gene_query_func("_data/mouse_genes_mgi.sqlite")
+query_variants <- create_variant_query_func(here("../pQTL_website/_data/cc_variants.sqlite"))
+query_genes <- create_gene_query_func(here("../pQTL_website/_data/mouse_genes_mgi.sqlite"))
 # sex calls from Alex Stanton retrieved via slack on July 28, 2020
 sex_calls <- read_csv(here("../pQTL_website/_data/ploidystatus_AS_07282020.csv"))
 # for LOLA
-regionDB = loadRegionDB(here("../pQTL_website/_data/LOLA/nm/t1/resources/regions/LOLACore/mm10/"))
+regionDB = loadRegionDB(here("_data/LOLA/nm/t1/resources/regions/LOLACore/mm10/"))
 
 ```
 
@@ -825,17 +817,21 @@ herit.esc_atac <- est_herit(
 ```
 
 
-```{r, fig.align='center', echo=FALSE, fig.cap="Experimental overview."}
-knitr::include_graphics(here("figures/fig1a.png"))
+## Figure 1A: Overview of data sets
+
+```{r fig1a}
+
+
+
 ```
 
 We have a unique data set where 200 DO embryonic stem cell lines with distinct genotypes have chromatin accessibility, transcriptome and proteome measures with 163 of them containing all three. Below is a brief summary of each data, please see the manuscript for details. The goal of this website is to accompany the Aydin et al. 2022 manuscript, providing the necessary data and code for reproducibility.
 
-## Protein abundance (Proteomics)
  
-Below are the filtered, normalized abundances of `r formatC(ncol(expr.esc_prot), big.mark=",")` proteins across `r nrow(expr.esc_prot)` DO mESC lines.  
+Below are the filtered, normalized abundances of `r formatC(ncol(expr.esc_prot), big.mark=",")` proteins across `r nrow(expr.esc_prot)` DO mESC lines (Table S1 in Aydin et al., (2022)).  
  
 ```{r protein_abundance_table}
+
 expr.esc_prot %>% 
   as_tibble( rownames = "sampleid") %>% 
   pivot_longer( cols = 2:7433, names_to = "protein_id", values_to = "protein_abundance") %>%
@@ -846,21 +842,50 @@ expr.esc_prot %>%
                values_from = "protein_abundance") %>% 
   # mutate_if( is.numeric, formatC, format = "fg", digits =2 ) %>% 
   create_dt()
+
 ```
 
 Below are the sample details including the sex and genotype at the *Lifr* locus for each cell line.
 
 ```{r protein_samples_table}
+
 covarTidy.esc_prot %>% 
   left_join(covar.lifr, by = c("top_muga"="rowname")) %>% 
   select(sampleid, sex, lifr_geno) %>% 
   mutate( sex = ifelse( sex == "M", "Male", "Female")) %>% 
   rename( `Genotype at Lifr` = lifr_geno) %>% 
   create_dt()
+
 ```
 
-## Chromatin accessibility (ATAC-seq) and gene expression (RNA-seq)
+ 
+## Figure 1B: Detection bias in proteomics
 
-Chromatin accessibility and gene expression data sets area obtained from Skelly et al,. 2020. There are `r formatC(nrow(atac.counts), big.mark=",")` ATAC-seq peaks measured across `r ncol(atac.counts)-3` DO mESC lines where the peaks are normalized for library size using `edgeR cpm` function. Here, I am using the `ComBat` function from `sva` package to additionally correct for the effects of library prep done in two separate batches. Next, I add functional annotations using the `annotatePeak` function from `ChIPseeker` R package. We have transcript abundance measurements for `r formatC(ncol(expr.esc_rna), big.mark=",")` genes across `r nrow(expr.esc_rna)` DO mESC lines. The raw counts were obtained using the RNA-seq analysis pipeline described in Skelly et al., 2020 using paired-end 75bp reads. Briefly, the total raw counts per gene were retrieved using EMASE, upper quartile normalized and corrected for batch effects due to different library preps using `ComBat` function from `sva` R package.   
+**add here:**
+  -   Fig1b generation: probablility of detection given transcript abundance. 
+  -   Table of values plotted to accompany the figure for download.
+  -   ORA for detected + not detected proteins -- Old table S1 - new table S2
+  -   Figures S1A, B, C
+  -   
 
+## Figure 1C: Principal component analysis of the pluripotent proteome
 
+**add here:**
+  -   Fig1C generation: PCA plot
+  -   Table of values plotted to accompany the fig for download.
+  -   Table showing top drivers of PC1 & statistical test for enrichment of X chr genes
+  -   ORA with PC1 drivers - table
+  -   Fig S1D, E
+  -   sex effects statistical test code + table with results
+  
+## Figure 1D: Geneset variation analysis of the pluripotent proteome
+
+**add here:**
+  -   Fig1D generation: GSVA results
+  -   Table of GSVA results for protein + rna with accompanying code showing how it is generated -- old table s2 new table S3
+  -   ORA with most/least variable proteins + table
+  -   Fig SF, G
+  
+  
+  
+  
