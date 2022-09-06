@@ -11,7 +11,15 @@ output:
     code_folding: hide
 ---
 
-```{r load_packages, warning=FALSE, message=FALSE}
+```{=html}
+<style>
+p.caption {
+  font-size: 1em;
+}
+</style>
+```
+
+```{r load_packages, warning=FALSE, message=FALSE, echo =FALSE}
 # options
 options(stringsAsFactors = F)
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
@@ -57,9 +65,7 @@ library(here)
 source(here("_src/functions.R")) # source all the common functions
 ```
 
-
-
-```{r load_annotate_omics_data, warning=FALSE, message=FALSE, results="hide" }
+```{r load_annotate_omics_data, warning=FALSE, message=FALSE, results="hide" , echo =FALSE}
 ##### Protein data
 # Note the ensembl protein id's are from v98
 load(here("../pQTL_website/_data/DO_mESC_pQTL_forMapping_noPoly_v3.RData"))
@@ -142,7 +148,7 @@ atac.peak.annots_full <- as_tibble(peakAnno) %>%
   select(-seqnames)
 ```
 
-```{r id_matching, message=FALSE, warning=FALSE}
+```{r id_matching, message=FALSE, warning=FALSE, echo =FALSE}
 # I am using v98 annotations since protein id's are v98
 # Saved all gene annotations from biomart using Sept2019 archive http://sep2019.archive.ensembl.org/biomart
 all_annot_v98 <- read_tsv( here("../pQTL_website/_data","ensembl_gene_annotations_v98.txt")) %>% 
@@ -152,11 +158,12 @@ rename( "ensembl_gene_id" = "Gene stable ID",
           "gene_end" = "Gene end (bp)",
           "gene_chr" = "Chromosome/scaffold name",
           "mgi_symbol" = "MGI symbol",
-          "gene_biotype" = "Gene type") %>% 
+          "gene_biotype" = "Gene type"
+        ) %>% 
   group_by(ensembl_gene_id) %>% 
   mutate( n_gene_id = n()) %>% # there are cases where gene id is repeated with a valid protein id + NA
   ungroup() %>% 
-  filter( !(n_gene_id >1 & is.na(protein_id)) ) %>% 
+  filter( !(n_gene_id >1 & is.na(protein_id) & gene_biotype =="protein_coding") ) %>% 
   select(-n_gene_id)
 # make all.genes, all.prots, atac.peak.annots
 all.genes <- all_annot_v98 %>% 
@@ -200,8 +207,7 @@ all_omics_ids <- full_join( all_atac_peak_gene_annots, all.genes) %>%
 # save( all.genes, all.prots, atac.peak.annots, file = here("_data","updated_annotations_04042022.RData"))
 ```
 
-
-```{r load_qtl_data, warning=FALSE, message=FALSE, results="hide" }
+```{r load_qtl_data, warning=FALSE, message=FALSE, results="hide" , echo =FALSE}
 
 ######### merged caQTL, eQTL, pQTL
 # see "_src/" for details on how they are merged
@@ -308,8 +314,7 @@ peaks.esc.overlap.wEffs <- peaks.esc.overlap2 %>%
   left_join( (peaks.esc_prot.wEffs %>% select( protein_id, peak_chr, lod.esc_prot , before.esc_prot, after.esc_prot, paste0(LETTERS[1:8],".esc_prot"))) )
 ```
 
-
-```{r shared_data, warning=FALSE, message=FALSE}
+```{r shared_data, warning=FALSE, message=FALSE, echo =FALSE}
 #### Shared data
 # get the set of shared genes btw protein + rna
 shared.genes <- inner_join( all.genes, all.prots)
@@ -434,7 +439,7 @@ peaks.shared.genes <- peaks.esc.overlap2 %>%
          peak_cM.esc_rna = as.numeric(peak_cM.esc_rna))
 ```
 
-```{r load_gene_sets, warning=FALSE, message=FALSE, results='hide'}
+```{r load_gene_sets, warning=FALSE, message=FALSE, results='hide', echo =FALSE}
 # Complex members retreieved from Ori et al 2016, additional file2:  https://variablecomplexes.embl.de/html-tables/Additional_file_2.html
 complexes <- read_xlsx(path = here("../pQTL_website/_data", "protein_complexes.xlsx")) # Assuming they are using 2016 human ensembl id's. but not worrying about it atm.
 complex.genes <- (str_split(complexes$`Member identifiers (human Ensembl gene)`, " "))
@@ -468,14 +473,7 @@ load(here("../pQTL_website/_data/complex_gene_list.RData"))
 all.tfs <- readxl::read_xlsx(path = here("../pQTL_website/_data/Mouse_TFs_TcoFDB.xlsx")) %>%
   select(Symbol) %>%
   rename(mgi_symbol = Symbol)
-mrna <- expr.esc_rna %>%
-  as.data.frame() %>%
-  summarize_all(.funs = mean, na.rm = T) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  dplyr::rename(ensembl_gene_id = rowname, avg_rna = V1) %>%
-  filter(ensembl_gene_id %in% (filter(all.genes, gene_biotype == "protein_coding"))$ensembl_gene_id) 
+
   
 # esc gene lists
 # load lists
@@ -568,8 +566,7 @@ genes_2c <- read_xlsx( path = here("../pQTL_website/_data","Hendrickson_2017_tab
   filter( !is.na(mgi_symbol)) 
 ```
 
-
-```{r load_mediations, warning=FALSE, message=FALSE}
+```{r load_mediations, warning=FALSE, message=FALSE, echo =FALSE}
 # load mediation results
 load(here("../pQTL_website/_data/DO_mESC_eQTL_protein_mediation_lod6_v3_merged.RData")) # eqtl_rna_meds
 load(here("../pQTL_website/_data/DO_mESC_eQTL_RNA_mediation_lod6_v3_merged.RData")) # eqtl_prot_meds
@@ -580,7 +577,7 @@ load(here("../pQTL_website/_data/DO_mESC_caQTL_rna_mediation_merged_v2.RData"))
 load(here("../pQTL_website/_data/DO_mESC_caQTL_prot_mediation_merged_v2.RData"))
 ```
 
-```{r misc, warning=FALSE, message=FALSE, results="hide" }
+```{r misc, warning=FALSE, message=FALSE, results="hide" , echo =FALSE}
 ## lifr genotypes
 # get_LIFR_genotypes
 # using Dan's code to get LIFR genotypes for the full list of animals
@@ -639,6 +636,7 @@ data_frame(
   rowname = c((inbred), (wildder), (hets))
 ) %>%
   mutate(rowname = ifelse(is.na(rowname), "A903DI1C.C12", rowname)) -> covar.lifr
+
 merged.covar %>%
   as.data.frame() %>%
   rownames_to_column() %>%
@@ -683,209 +681,1083 @@ regionDB = loadRegionDB(here("_data/LOLA/nm/t1/resources/regions/LOLACore/mm10/"
 
 ```
 
+<br> <br>
 
-```{r rna_var}
-# rna
-var.rna <- expr.esc_rna %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ var(., na.rm = T))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(ensembl_gene_id = rowname, var = V1) %>%
-  arrange(desc(var))
-n.rna <- expr.esc_rna %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ sum(!is.na(.)))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(ensembl_gene_id = rowname, n = V1) %>%
-  arrange(desc(n))
-mean.rna <- expr.esc_rna %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ mean(., na.rm = T))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(ensembl_gene_id = rowname, mean = V1) %>%
-  arrange(desc(mean))
-var.rna <- inner_join(var.rna, mean.rna) %>%
-  inner_join(., n.rna) %>%
-  left_join(., select(all.genes, ensembl_gene_id, ensembl_gene_id, mgi_symbol, gene_chr)) %>%
-  mutate(sd = sqrt(var)) %>%
-  mutate(cv.rna = 100 * sd / (mean)) %>%
-  rename(mean.rna = mean, sd.rna = sd)
+### Figure 1A: Overview of data sets
+
+```{r Figure1A, fig.cap = "Figure 1A: Nearly 200 embryonic stem cell lines were established from blastocysts of Diversity Outbred mice, and quantified using ATAC-seq, RNA-seq (Skelly et al., 2020), and multiplexed mass spectrometry; 163 lines have all three measures."}
+
+knitr::include_graphics(here("Figure1A.png"))
+
 ```
 
-```{r prot_var}
-# protein
-var.prot <- expr.esc_prot %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ var(., na.rm = T))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(protein_id = rowname, var = V1) %>%
-  arrange(desc(var))
-n.prot <- expr.esc_prot %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ sum(!is.na(.)))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(protein_id = rowname, n = V1) %>%
-  arrange(desc(n))
-mean.prot <- expr.esc_prot %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ mean(., na.rm = T))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(protein_id = rowname, mean = V1) %>%
-  arrange(desc(mean))
-var.prot <- inner_join(var.prot, mean.prot) %>%
-  inner_join(., n.prot) %>%
-  left_join(., select(all.prots, protein_id, protein_id, ensembl_gene_id, mgi_symbol, gene_chr)) %>%
-  mutate(sd = sqrt(var)) %>%
-  mutate(cv.prot = 100 * sd / (mean)) %>%
-  rename(mean.prot = mean, sd.prot = sd)
+<br>
+
+#### Table S1.Quantitative proteomic analysis of DO mESCs.
+
+Table containing normalized and filtered protein abundances (n = 7,432) across individual DO mESClines (n = 190) and DO mESC line details with experimental covariates sex and genotype at the *Lifr* locus.
+
+
+
+```{r TableS1_sheet1, echo = FALSE}
+
+# expr.esc_prot %>%
+#   as_tibble( rownames = "sampleid") %>%
+#   pivot_longer( cols = 2:7433, names_to = "protein_id", values_to = "protein_abundance") %>%
+#   left_join( all.prots) %>%
+#   select( sampleid, mgi_symbol, protein_id, protein_abundance ) %>%
+#   pivot_wider( id_cols = c("protein_id","mgi_symbol"),
+#                names_from = "sampleid",
+#                values_from = "protein_abundance") %>%
+#   #mutate_if( is.numeric, formatC, format = "fg", digits =2 ) %>%
+#   rename( `Protein ID` = protein_id,
+#           `MGI Symbol` = mgi_symbol) -> protein_abundance
+# 
+# 
+# covarTidy.esc_prot %>%
+#   left_join(covar.lifr, by = c("top_muga"="rowname")) %>%
+#   select(sampleid, sex, lifr_geno) %>%
+#   mutate( sex = ifelse( sex == "M", "Male", "Female")) %>%
+#   rename( `Genotype at Lifr` = lifr_geno,
+#           `Sample ID` = sampleid,
+#           Sex = sex) -> sample_details
+# 
+# writexl::write_xlsx( list( Protein_abundance = protein_abundance,
+#                              Sample_details = sample_details),
+#                     path = here("TableS1_DO_mESC_Proteomes.xlsx"),
+#                     col_names = TRUE,
+#                     format_headers = TRUE
+#                     )
+
+
+xfun::embed_file(here("Table_S1.xlsx"))
+
 ```
 
-```{r atac_rna_var, cache=TRUE}
-# atac - filtering for ATACseq peaks in shared genes
-var.atac <- atac.counts[threeway.shared.genes$peak_id, 4:ncol(atac.counts)] %>%
-  t() %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ var(., na.rm = T))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(peak_id = rowname, var = V1) %>%
-  arrange(desc(var))
-n.atac <- atac.counts[threeway.shared.genes$peak_id, 4:ncol(atac.counts)] %>%
-  t() %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ sum(!is.na(.)))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(peak_id = rowname, n = V1) %>%
-  arrange(desc(n))
-mean.atac <- atac.counts[threeway.shared.genes$peak_id, 4:ncol(atac.counts)] %>%
-  t() %>%
-  as_tibble(.) %>%
-  summarise_all(list(~ mean(., na.rm = T))) %>%
-  t() %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  rename(peak_id = rowname, mean = V1) %>%
-  arrange(desc(mean))
-var.atac <- inner_join(var.atac, mean.atac) %>%
-  inner_join(., n.atac) %>%
-  left_join(., select(threeway.shared.genes, peak_id, ensembl_gene_id, protein_id, mgi_symbol, gene_chr)) %>%
-  mutate(sd = sqrt(var)) %>%
-  mutate(cv.atac = 100 * sd / (mean)) %>%
-  rename(mean.atac = mean, sd.atac = sd)
-all.var <- left_join(
-  select(var.atac, peak_id, ensembl_gene_id, protein_id, cv.atac, mean.atac, sd.atac),
-  select(var.prot, protein_id, ensembl_gene_id, cv.prot, mean.prot, sd.prot)
-) %>%
-  left_join(select(var.rna, ensembl_gene_id, cv.rna, mean.rna, sd.rna)) 
+<br> <br>
+
+### Figure 1B: Detection bias in proteomics
+
+```{r Figure1B, fig.height=3, fig.width=4, fig.cap="Figure 1B: Protein detection rate is linked to transcript abundance. The probability of a gene to have protein abundance measurement given its average transcript abundance among 174 mESCs with both transcriptome and proteome data."}
+
+# get the list of protein coding genes with transcript abundance in DO mESCs
+all.prot_coding.genes <-  all.genes %>% 
+  filter( gene_biotype =="protein_coding")
+
+# get average transcript abundance for all protein coding genes
+mrna <- expr.esc_rna %>%
+  as_tibble( rownames = "sampleid") %>%
+  select( all.prot_coding.genes$ensembl_gene_id) %>% 
+  summarize_all(.funs = mean, na.rm = T) %>% 
+  pivot_longer( all.prot_coding.genes$ensembl_gene_id, 
+                names_to = "ensembl_gene_id", 
+                values_to = "avg_rna")
+
+# annotate if the gene is found in the protein data by setting prot = TRUE/FALSE
+# add average transcript abundance 
+all.prot_coding.genes%>% 
+  select(ensembl_gene_id, mgi_symbol,ensembl_gene_id) %>%
+  mutate(prot = ifelse( (ensembl_gene_id %in% all.prots$ensembl_gene_id |
+                           mgi_symbol %in% all.prots$mgi_symbol), TRUE, FALSE)) %>%
+  left_join(., mrna) -> prop.data
+
+
+  
+  
+# calculate the probability of a protein being present given its mRNA abundance
+get_props <- function(dat) {
+  prop.table <- c()
+  for (i in c(1, 5, 10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 800, 1000, 2000, 5000, 10000, 50000, 1e05)) {
+    prop <- dat %>%
+      mutate(mRNA = ifelse(avg_rna > i, "at least", "less than")) %>%
+      count(mRNA, prot) %>%
+      spread(prot, n) %>%
+      mutate( `FALSE` = ifelse( is.na(`FALSE`), 0, `FALSE`),
+              `TRUE` = ifelse( is.na(`TRUE`), 0, `TRUE`)) %>% # replace NAs in case there aren't any detected/undetected proteins
+      filter( (`TRUE`+`FALSE` > 5)) %>% # filter to make sure each bin has at least 5 genes. 
+      mutate(detection_probability = `TRUE` / (`FALSE` + `TRUE`))
+    prop.temp <- prop %>%
+      filter(mRNA == "at least") %>%
+      select(detection_probability) %>%
+      mutate(avg_rna = i)
+    prop.table <- rbind(prop.table, prop.temp)
+  }
+  return(prop.table)
+}
+
+prob_plot <- get_props(prop.data) %>% 
+  rename( `Probability of protein detection` = detection_probability,
+          `Average transcript abundance` = avg_rna) %>% 
+  ggplot() +
+  aes(x = `Average transcript abundance`, 
+      y = `Probability of protein detection`) +
+  geom_point(size = 4) +
+  scale_x_log10( expand= expansion( mult = c(.1, .12))) +
+  theme_pubclean(base_size = 12) +
+  geom_line() +
+  ylab("Probability of protein detection") +
+  xlab("Average transcript abundance") +
+  ylim(0.5, .95)+
+  theme(
+    axis.text = element_text( size = 12),
+    axis.title = element_text( size = 12)
+  )
+
+ggarrange(prob_plot, 
+          labels = "B", 
+          font.label = list( size = 20))
+
 ```
 
+<br>
 
-```{r heritability, cache= TRUE, warning=FALSE, message=FALSE}
-kinship.esc_prot <- calc_kinship( probs.esc_prot)
-kinship.esc_rna <- calc_kinship( probs.esc_rna)
-kinship.esc_atac <- calc_kinship( probs.esc_atac)
-herit.esc_prot <- est_herit(
-  pheno = exprZ.esc_prot,
-  kinship = kinship.esc_prot, 
-  addcovar = covar.esc_prot
+```{r Figure1B_data, fig.cap="Data used in Figure 1B."}
+
+get_props(prop.data) %>% 
+  rename( `Probability of protein detection` = detection_probability,
+          `Average transcript abundance` = avg_rna) %>% 
+  mutate_if( is.numeric, round ,2) %>% 
+  create_dt()
+
+```
+
+<br>
+
+#### Table S2. Over-representation analysis of detected and undetected proteins. 
+
+Over-represented biological processes and pathways in proteins detected in all samples, and protein coding genes with transcript abundance lacking protein abundance (undetected proteins) are listed. Details include the data source, term id, term name, term size, the number of intersecting proteins and the FDR for each term identified to be overrepresented in detected or undetected protein coding genes.
+
+```{r TableS2_generate, cache = TRUE, warning=FALSE, message=FALSE}
+
+# get proteins expressed in all samples
+expr.esc_prot.comp <- expr.esc_prot %>%
+  as.data.frame() %>%
+  select( all_of(all.prots$protein_id))  %>% 
+  select_if(~ !any(is.na(.)))
+
+# get the gene/protein details for proteins measured in ALL the samples
+prots.detected <- all.prots %>% 
+  filter(protein_id %in% colnames(expr.esc_prot.comp),
+         gene_biotype== "protein_coding")
+
+# over-representation analysis for proteins detected in all samples vs all proteins
+g.prot.detected <- gost(
+  query = prots.detected$mgi_symbol,
+  organism = "mmusculus",
+  domain_scope = "custom",
+  custom_bg = all.prots$mgi_symbol,
+  evcodes = TRUE,
+  correction_method = "fdr"
 )
-herit.esc_rna <- est_herit(
-  pheno = exprZ.esc_rna,
-  kinship = kinship.esc_rna, 
-  addcovar = covar.esc_rna
+g.prot.detected$result <- g.prot.detected$result %>% 
+  filter(term_size < 600)
+
+g.prot.detected$result %>% 
+  select(
+    `Data source` = source,
+    `Term ID` = term_id,
+    `Term Name` = term_name, 
+    `Term size` = term_size, 
+    `# of intersecting proteins` = intersection_size,
+     FDR = p_value
+    ) -> tables2_sheet1
+
+# get proteins not detected although RNA is detected
+all.genes %>% 
+  filter( !ensembl_gene_id %in% all.prots$ensembl_gene_id & # not in protein data
+            gene_biotype == "protein_coding") -> not.detected 
+
+all.prot_coding.genes <-  all.genes %>% 
+  filter( gene_biotype =="protein_coding")
+
+g.prot.not.detected <- gost(
+  query = not.detected$mgi_symbol,
+  organism = "mmusculus",
+  domain_scope = "custom",
+  custom_bg = all.prot_coding.genes$mgi_symbol, 
+  evcodes = TRUE,
+  correction_method = "fdr"
 )
-herit.esc_atac <- est_herit(
-  pheno = counts.normZ,
-  kinship = kinship.esc_atac, 
-  addcovar = covar.esc_atac
-)
+g.prot.not.detected$result <- g.prot.not.detected$result %>% filter(term_size < 600)
+
+g.prot.not.detected$result %>% 
+  select(
+    `Data source` = source,
+    `Term ID` = term_id,
+    `Term Name` = term_name, 
+    `Term size` = term_size, 
+    `# of intersecting proteins` = intersection_size,
+     FDR = p_value
+    ) -> tables2_sheet2
+  
 ```
 
+<br>
 
-## Figure 1A: Overview of data sets
+```{r TableS2_display, echo = FALSE}
 
-```{r fig1a}
+
+# writexl::write_xlsx( list( Detected_protein_coding_genes = tables2_sheet1,
+#                              Undetected_protein_coding_genes = tables2_sheet2),
+#                     path = here("TableS2_ORA_protein_detection.xlsx"),
+#                     col_names = TRUE,
+#                     format_headers = TRUE
+#                     )
+
+
+xfun::embed_file(here("Table_S2.xlsx"))
+
+```
+
+<br>
+
+#### Figure S1A-C: Transcription factors show lower transcript and protein abundance than other genes
+
+```{r FigureS1A_C, fig.cap="FigureS1: (A) Genes where protein abundance is detected have a significantly higher mean transcript abundance (One way ANOVA, followed by t-test). Average transcript abundance of protein coding genes (n = 12,732) that are detected (TRUE, n = 7,240) and not detected (FALSE, n = 5,492) in the proteomics data are plotted. (B, C) TFs show a significantly lower mean for both transcript and protein abundance in comparison to other genes (One way ANOVA, followed by t-test). Average transcript and protein abundance of protein coding genes that are transcription factors (TF) and not transcription factors (Not a TF) are plotted.", fig.width=12, fig.height=5}
+
+
+rna_detect_plot <- apply(na.omit(expr.esc_rna), 2, mean) %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  left_join(., all.genes, by = c("rowname" = "ensembl_gene_id")) %>%
+  filter(gene_biotype %in% c("protein_coding")) %>%
+  mutate(detected = ifelse(rowname %in% all.prots$ensembl_gene_id, "Detected", "Not detected")) %>%
+  ggplot() +
+  aes(x = detected, y = `.`) +
+  geom_boxplot(width = 0.2) +
+  ylab("Average transcript abundance") +
+  scale_y_log10( expand = expansion(mult =c(0.4,0.2))) +
+  theme_pubclean(base_size = 18) +
+  #ggtitle("Protein coding genes") +
+  xlab("") +
+  stat_compare_means(method = "anova",label.y=7.5)+
+  stat_compare_means(method = "t.test",label.y=6.5)
+  
+
+tf_rna_plot <- apply(na.omit(expr.esc_rna), 2, mean) %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  left_join(., all.genes, by = c("rowname" = "ensembl_gene_id")) %>%
+    filter(gene_biotype %in% c("protein_coding")) %>%
+  mutate(is_tf = ifelse( mgi_symbol %in% all.tfs$mgi_symbol, "TF", "Not a TF")) %>%
+  ggplot() +
+  aes(x = is_tf, y = `.`) +
+  geom_boxplot(width = 0.2) +
+  ylab("Average transcript abundance") +
+  scale_y_log10( expand = expansion(mult =c(0.4,0.2))) +
+  theme_pubclean(base_size = 18) +
+  #ggtitle("Protein coding genes") +
+  xlab("") +
+  stat_compare_means(method = "anova",label.y=7.5)+
+  stat_compare_means(method = "t.test",label.y=6.5)
+
+tf_prot_plot <- apply((expr.esc_prot[,all.prots$protein_id]), 2, mean, na.rm=TRUE) %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  left_join( ., all.prots, by = c("rowname" = "protein_id")) %>% 
+  mutate(is_tf = ifelse( mgi_symbol %in% all.tfs$mgi_symbol, "TF", "Not a TF")) %>%
+  ggplot() +
+  aes(x = is_tf, y = `.`) +
+  geom_boxplot(width = 0.2) +
+  ylab("Average protein abundance") +
+  theme_pubclean(base_size = 18) +
+  #ggtitle("Protein coding genes") +
+  xlab("") +
+  scale_y_continuous( expand =expansion(mult =c(0.3,0.2))) +
+  stat_compare_means(method = "anova", label.y=17)+
+  stat_compare_means(method = "t.test",label.y=15.5)
+
+
+
+detection_plot <- ggarrange(rna_detect_plot, 
+                            tf_rna_plot,tf_prot_plot, 
+                            nrow = 1, 
+                            widths = c(0.7,0.7,0.7), 
+                            labels = c("A","B","C"),
+                            font.label = list( size = 20))
+
+detection_plot
+
+```
+
+<br> <br>
+
+### Figure 1C: Principal component analysis of the pluripotent proteome
+
+```{r Figure1C, fig.cap="Figure 1C: Principal component analysis reveals sex as a significant source of variation among DO mESC proteomes. PC1 and PC2 for 190 mESCs are plotted and colored by sex.", fig.width=8, fig.height=4}
+
+# principal component analysis using pcaMethods::pca function.
+pca.prot <- pca(object = expr.esc_prot, 
+                            method = "svdImpute", 
+                            scale = "uv", 
+                            nPcs = 10, 
+                            center = TRUE
+                            )
+
+# get values for Principal components
+scores(pca.prot) %>%
+  as_tibble( rownames ="sampleid") %>% 
+  left_join(covarTidy.esc_prot) %>%
+  mutate(sex = ifelse(sex == "F", "Female", "Male")) %>%
+  rename(
+    `Sample ID` = sampleid, 
+    Sex = sex
+  ) %>% 
+  ggplot() +
+  aes(x = PC1, y = PC2, col = Sex) +
+  geom_point(size = 4, alpha = 0.7) +
+  theme(
+    axis.text = element_text(size = 18),
+    axis.title = element_text(size = 20), 
+    legend.text = element_text(size = 16), legend.title = element_text(size = 16)
+  ) +
+  xlab(paste0("PC1 (", round(pca.prot@R2[1], 3) * 100, "%)")) +
+  ylab(paste0("PC2 (", round(pca.prot@R2[2], 3) * 100, "%)")) +
+  theme_pubclean(base_size = 18) + 
+  color_palette("npg")+
+  fill_palette("npg")+
+  xlim(-100,150)+
+  ylim(-100,150)+
+  facet_wrap(~Sex, strip.position = "right")+
+  theme(
+    strip.background = element_blank(),
+    strip.text.x = element_blank()
+  ) -> pca_plot
+
+ggarrange(pca_plot, 
+          labels = "C",
+          font.label = list( size = 20))
 
 
 
 ```
 
-We have a unique data set where 200 DO embryonic stem cell lines with distinct genotypes have chromatin accessibility, transcriptome and proteome measures with 163 of them containing all three. Below is a brief summary of each data, please see the manuscript for details. The goal of this website is to accompany the Aydin et al. 2022 manuscript, providing the necessary data and code for reproducibility.
+<br>
 
- 
-Below are the filtered, normalized abundances of `r formatC(ncol(expr.esc_prot), big.mark=",")` proteins across `r nrow(expr.esc_prot)` DO mESC lines (Table S1 in Aydin et al., (2022)).  
- 
-```{r protein_abundance_table}
+```{r Figure1C_data, fig.cap="Data used in plotting Figure 1C."}
 
-expr.esc_prot %>% 
+scores(pca.prot) %>%
   as_tibble( rownames = "sampleid") %>% 
-  pivot_longer( cols = 2:7433, names_to = "protein_id", values_to = "protein_abundance") %>%
+  left_join(covarTidy.esc_prot) %>%
+  mutate(sex = ifelse(sex == "F", "Female", "Male")) %>% 
+  select(sampleid, sex, PC1, PC2) %>% 
+  mutate_if(is.numeric, round ,2) %>% 
+  rename(
+    `Sample ID` = sampleid, 
+    Sex = sex
+  ) %>% 
+  create_dt()
+
+```
+
+<br>
+
+#### Drivers of PC1
+
+```{r PC1_drivers, fig.width=10, fig.height=5, fig.cap="Chromosomal locations of the top 10% of proteins that contribute to PC1."}
+
+# get top drivers of PC1
+loadings(pca.prot) %>%
+  as_tibble( rownames = "protein_id") %>% 
   left_join( all.prots) %>% 
-  select( sampleid, mgi_symbol, protein_id, protein_abundance ) %>% 
-  pivot_wider( id_cols = c("protein_id","mgi_symbol"), 
-               names_from = "sampleid", 
-               values_from = "protein_abundance") %>% 
-  # mutate_if( is.numeric, formatC, format = "fg", digits =2 ) %>% 
+  select(mgi_symbol, gene_chr, PC1) %>%
+  filter( abs(PC1) >= quantile(abs(PC1), 0.90))-> pc1.loadings # most contributing 10%
+
+# PC1 drivers by chromosome
+
+pc1.loadings %>% 
+  group_by(gene_chr) %>%
+  # count() %>%
+  # arrange(desc(n)) %>%
+  ggplot()+
+  aes( x = gene_chr)+
+  geom_bar()+
+  theme_pubclean( base_size = 18)+
+  xlab("Chr")
+  
+```
+
+<br>
+
+```{r PC1_drivers_ORA, fig.cap="Over-represented biological processes and pathways in PC1 drivers.", cache = TRUE}
+
+
+
+g.pc1 <- gost(query = pc1.loadings$mgi_symbol, 
+              organism = "mmusculus", 
+              domain_scope = "custom", 
+              custom_bg = all.prots$mgi_symbol, 
+              evcodes = TRUE,
+              correction_method = "fdr")
+g.pc1$result <- g.pc1$result %>% filter(term_size < 600)
+
+g.pc1$result %>% 
+   select(
+    `Data source` = source,
+    `Term ID` = term_id,
+    `Term Name` = term_name, 
+    `Term size` = term_size, 
+    `# of intersecting proteins` = intersection_size,
+     FDR = p_value
+    ) %>%
+  mutate_if( is.numeric, formatC, digits =2) %>% 
   create_dt()
 
 ```
 
-Below are the sample details including the sex and genotype at the *Lifr* locus for each cell line.
+<br>
 
-```{r protein_samples_table}
+#### Figure S1D-E: Variation in protein abundance
 
-covarTidy.esc_prot %>% 
-  left_join(covar.lifr, by = c("top_muga"="rowname")) %>% 
-  select(sampleid, sex, lifr_geno) %>% 
-  mutate( sex = ifelse( sex == "M", "Male", "Female")) %>% 
-  rename( `Genotype at Lifr` = lifr_geno) %>% 
+```{r FigureS1D_E, fig.cap="(D, E) Protein abundance is highly variable across DO mESCs. Histograms showing the mean abundance and variance per protein plotted for 7,342 proteins across 190 DO mESC lines.", fig.width=8, fig.height=4}
+
+expr.esc_prot %>%
+  as_tibble(.) %>%
+  summarise_all(list(~ mean(., na.rm = T))) %>% 
+  pivot_longer( all.prots$protein_id,
+                names_to = "protein_id",
+                values_to ="mean.prot") %>% 
+  ggplot() +
+  aes(x = mean.prot) +
+  geom_histogram(binwidth = 0.1) +
+  xlab("Mean") +
+  theme_pubclean(base_size = 18) -> p.mean.hist
+
+expr.esc_prot %>%
+  as_tibble(.) %>%
+  summarise_all(list(~ var(., na.rm = T))) %>% 
+  pivot_longer( all.prots$protein_id,
+                names_to = "protein_id",
+                values_to ="var") %>% 
+  ggplot() +
+  aes(x = var) +
+  geom_histogram(binwidth = 0.01) +
+  xlab("Variance") +
+  theme_pubclean(base_size = 18) +
+  scale_x_log10() -> p.var.hist
+
+ggarrange(p.mean.hist, 
+          p.var.hist, 
+          nrow =1, 
+          labels = c("D","E"),
+          font.label = list( size = 18))
+
+```
+
+<br>
+
+#### Sex effects on protein abundance
+
+```{r sex_eff, cache = TRUE, results='hide'}
+
+# updating the code to use anova followed by tukey's hsd:
+expr.esc_prot %>%
+  t() %>% 
+  as_tibble(rownames = "protein_id") %>%
+  filter( protein_id %in% all.prots$protein_id) %>% 
+  pivot_longer( cols = rownames(expr.esc_prot),
+                values_to = "protein_ab",
+                names_to = "sampleid") %>% 
+  left_join(., select(covarTidy.esc_prot, sampleid, sex)) %>% 
+  group_by(protein_id) %>% 
+  rstatix::anova_test( protein_ab ~ sex) %>% 
+  rstatix::adjust_pvalue( method = "BH") %>% 
+  rstatix::add_significance("p.adj") %>% 
+  as_tibble() -> prot_sex_aov
+
+# passing the full data to tukey's then filtering
+expr.esc_prot %>%
+  t() %>% 
+  as_tibble(rownames = "protein_id") %>% 
+  filter( protein_id %in% all.prots$protein_id) %>% 
+  pivot_longer( cols = rownames(expr.esc_prot),
+                values_to = "protein_ab",
+                names_to = "sampleid") %>% 
+  left_join(., select(covarTidy.esc_prot, sampleid, sex)) %>% 
+  group_by(protein_id) %>% 
+  rstatix::tukey_hsd(protein_ab ~ sex) %>% 
+  filter( protein_id %in% (filter(prot_sex_aov, p.adj.signif != "ns"))$protein_id ) -> prot_sex_tukeys
+
+
+# get the medians for later
+expr.esc_prot %>%
+  t() %>% 
+  as_tibble(rownames = "protein_id") %>%
+  filter( protein_id %in% all.prots$protein_id) %>% 
+  pivot_longer( cols = rownames(expr.esc_prot),
+                values_to = "protein_ab",
+                names_to = "sampleid") %>% 
+  left_join(., select(covarTidy.esc_prot, sampleid, sex)) %>% 
+  group_by(protein_id,sex) %>% 
+  summarize( med = median(protein_ab, na.rm =T)) %>% 
+  pivot_wider( id_cols = "protein_id",
+               names_from = "sex",
+               values_from = "med")-> prot_sex_med
+```
+
+```{r Sex_eff_table, fig.cap="Table of proteins showing a significant sex effect."}
+
+prot_sex_tukeys %>%
+  left_join( all.prots) %>% 
+  left_join( prot_sex_med) %>% 
+  arrange(p.adj) %>%
+  mutate_if( is.numeric, round, 2) %>%
+  select(
+    `Protein ID` = protein_id,
+    `MGI Symbol`= mgi_symbol, 
+    `Protein location (chr)` = gene_chr,
+    `Female median`=`F`,
+    `Male median`= M
+   ) %>%
   create_dt()
 
 ```
 
- 
-## Figure 1B: Detection bias in proteomics
+<br> <br>
 
-**add here:**
-  -   Fig1b generation: probablility of detection given transcript abundance. 
-  -   Table of values plotted to accompany the figure for download.
-  -   ORA for detected + not detected proteins -- Old table S1 - new table S2
-  -   Figures S1A, B, C
-  -   
+### Figure 1D: Geneset variation analysis of the pluripotent proteome
 
-## Figure 1C: Principal component analysis of the pluripotent proteome
+```{r run_gsva_protein_and_rna, cache = TRUE, results='hide', warning=FALSE, message=FALSE}
 
-**add here:**
-  -   Fig1C generation: PCA plot
-  -   Table of values plotted to accompany the fig for download.
-  -   Table showing top drivers of PC1 & statistical test for enrichment of X chr genes
-  -   ORA with PC1 drivers - table
-  -   Fig S1D, E
-  -   sex effects statistical test code + table with results
-  
-## Figure 1D: Geneset variation analysis of the pluripotent proteome
+library(GSVA)
+library(GO.db)
 
-**add here:**
-  -   Fig1D generation: GSVA results
-  -   Table of GSVA results for protein + rna with accompanying code showing how it is generated -- old table s2 new table S3
-  -   ORA with most/least variable proteins + table
-  -   Fig SF, G
+# Preparing gene sets from GO
+# reading in the GO + mgi downloaded from: http://www.informatics.jax.org/gotools/data/input/MGIgenes_by_GOid.txt
+go_terms <- read_tsv( "http://www.informatics.jax.org/gotools/data/input/MGIgenes_by_GOid.txt") %>% 
+  mutate( genes = str_split(genes, ",")) %>% 
+  unnest() # separete the symbols, note the overlap: length(intersect(unique(go_terms$genes), all.prots$mgi_symbol) ) = 6757
+
+slim_go_terms <- read_tsv( "http://www.informatics.jax.org/gotools/data/input/map2MGIslim.txt") %>% 
+  select(-term) %>% 
+  mutate( ONT = case_when( aspect == "P" ~  "BP",
+                     aspect == "F" ~ "MF",
+                     aspect == "C" ~ "CC"
+                     )
+          ) %>% 
+  select(-aspect)
+
+genesbygo <- split(go_terms$genes, go_terms$GO_id)
+
+go_terms_annot <- go_terms %>%  
+  select(GO_id) %>% 
+  distinct() %>% 
+  left_join( slim_go_terms %>%  select( GO_id, ONT) %>% distinct())
+
+goannot_wdef <- AnnotationDbi::select(GO.db, keys= unique(go_terms$GO_id), columns=c("GOID","DEFINITION","ONTOLOGY","TERM")) %>%
+  left_join( slim_go_terms, by=c("GOID"="GO_id")) %>% 
+  mutate( ONTOLOGY = ONT) %>% 
+  select(-ONT)
+
+go_bp <- goannot_wdef %>% filter( ONTOLOGY == "BP") %>% 
+  select(GOID) %>%  distinct()
+
+# Run GSVA using protein abundance
+expr.esc_prot_upd <- expr.esc_prot[, all.prots$protein_id]
+colnames(expr.esc_prot_upd) <- all.prots$mgi_symbol
+gsva_prot <- gsva(  expr = t(expr.esc_prot_upd),
+                    genesbygo,
+                    method ="gsva",
+                    kcdf = "none",
+                    min.sz = 5, 
+                    max.sz = 1000,
+                    mx.diff = TRUE)
+
+# Run GSVA with complexes to complement the co-abundance analysis
+genes_for_complex_gsva <- complex.genes %>%  
+  enframe( "Complex Name","human_ids") %>%
+  unnest(human_ids) %>% 
+  left_join( complex.gene.list) %>% 
+  filter( !is.na(protein_id)) %>% 
+  select( `Complex Name` , protein_id)
+gsva_complexes <- unique(genes_for_complex_gsva$`Complex Name`)
+genes_by_complex <- split(genes_for_complex_gsva$protein_id, genes_for_complex_gsva$`Complex Name`)
+gsva_prot_comp <-  gsva(  expr = t(expr.esc_prot[,all.prots$protein_id]),
+                    genes_by_complex,
+                    method ="gsva",
+                    kcdf = "none",
+                    min.sz = 5, 
+                    max.sz = 1000,
+                    mx.diff = TRUE)
+
+# Run GSVA using transcript abundance
+expr.esc_rna_upd <- expr.esc_rna[, all.genes$ensembl_gene_id]
+colnames(expr.esc_rna_upd) <- all.genes$mgi_symbol
+gsva_rna <- gsva(  expr = t(expr.esc_rna_upd),
+                    genesbygo,
+                    method ="gsva",
+                    kcdf = "none",
+                    min.sz = 5, 
+                    max.sz = 1000,
+                    mx.diff = TRUE)
+
+# Annotation and statistical follow up using ANOVA + Tukey's on Protein results
+covar.lifr  %>% 
+  rename( top_muga = rowname ) %>% 
+  left_join(sample.matches.all) %>% 
+  select(sampleid, lifr_geno) %>% 
+  inner_join(covarTidy.esc_prot) -> covar_lifr_upd
+
+gsva_prot %>% 
+  as_tibble(rownames = "Category") %>% 
+  filter( Category %in% go_bp$GOID) %>% #filtering for BP
+  rbind( as_tibble(gsva_prot_comp, rownames = "Category" )) %>% 
+  # rbind( as_tibble(gsva_prot3, rownames = "Category" )) %>% 
+  # rbind( as_tibble(gsva_prot4, rownames = "Category")) %>% 
+  pivot_longer( cols = rownames(expr.esc_prot_upd),
+                values_to = "Enrichment_Score",
+                names_to = "sampleid") %>% 
+  # add sexes + lifr genotypes
+  left_join( covar_lifr_upd) -> gsva_results
+
+
+gsva_results %>% 
+  group_by( Category) %>% 
+  rstatix::anova_test( Enrichment_Score ~ sex+lifr_geno+sex*lifr_geno) %>% 
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance("p.adj") %>% 
+  ungroup() -> aov_results 
+
+aov_results %>% 
+  as_tibble() %>% 
+  filter( p.adj.signif != "ns" ) -> signif_eff_terms
+
+# passing all to Tukey's with the full model
+gsva_results %>% 
+  group_by(Category) %>% 
+  rstatix::tukey_hsd( Enrichment_Score ~ sex+lifr_geno+sex:lifr_geno) %>% 
+  ungroup() %>% 
+  as_tibble() %>% 
+  left_join( goannot_wdef, by = c("Category" = "GOID")) -> results_tukey
+
+# filtering for the ones that were significant in ANOVA + Tukey's
+results_tukey %>% 
+  filter( p.adj < 0.05) %>% 
+  inner_join( ., select( signif_eff_terms, Category, term = Effect)) -> signif_results_tukey
+
+# Annotation and statistical follow up using ANOVA + Tukey's on RNA results
+gsva_rna %>% 
+  as_tibble(rownames = "Category") %>% 
+  filter( Category %in% go_bp$GOID) %>% #filtering for BP
+  pivot_longer( cols = rownames(expr.esc_rna_upd),
+                values_to = "Enrichment_Score",
+                names_to = "sampleid") %>% 
+  # add sexes + lifr genotypes
+  left_join( covar_lifr_upd) -> gsva_rna_results
+
+gsva_rna_results %>% 
+  group_by( Category) %>% 
+  rstatix::anova_test( Enrichment_Score ~ sex+lifr_geno+sex*lifr_geno) %>% 
+  rstatix::adjust_pvalue( method = "BH") %>%
+  rstatix::add_significance("p.adj") %>% 
+  ungroup() -> gsva_rna_aov
+
+gsva_rna_results %>% 
+  group_by(Category) %>% 
+  rstatix::tukey_hsd( Enrichment_Score ~ sex+lifr_geno+sex:lifr_geno) %>% 
+  ungroup() %>% 
+  as_tibble() %>% 
+  left_join( goannot_wdef, by = c("Category" = "GOID")) -> gsva_rna_tukey
+
+gsva_rna_aov %>% 
+  as_tibble() %>% 
+  filter( p.adj.signif != "ns" ) -> signif_eff_terms_rna
+
+gsva_rna_tukey %>% 
+  filter( p.adj < 0.05) %>% 
+  inner_join( ., select( signif_eff_terms_rna, Category, term = Effect)) -> signif_results_tukey_rna
+
+```
+
+```{r Figure1D, fig.width=16, fig.height=4, fig.cap="Figure 1D: Enrichment scores obtained from GSVA for Gene Ontology Biological Processes (GO:BP) showing significant differences between mESCs with different sexes and genotypes at the Lifr locus are plotted. GO:BP DNA methylation, chromatin remodeling and ribosome biogenesis show significantly higher enrichment in males in comparison to females and, protein ADP-ribosylation shows significantly higher enrichment in mESCs with at least one copy of the reference allele in comparison to ones carrying two copies of the alternative allele at the *Lifr* locus (two-way anova followed by Tukey’s HSD, `*: p value < 0.05, ****: p value < 0.00005`)."}
+
+gsva_results %>%
+  filter( Category ==  "GO:0006306") %>%
+  left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
+  rename( `GO ID` = Category, 
+          `GO Term`=TERM, 
+          Sample = sampleid, 
+          `Enrichment Score`=Enrichment_Score, 
+          Sex = sex, 
+          `Lifr genotype`=lifr_geno) %>% 
+  ggplot()+
+  aes( x = Sex,
+       y = `Enrichment Score`,
+       col = Sex)+
+  geom_boxplot(width =0.2, size = 1.1)+
+  #geom_jitter()+
+  #geom_beeswarm(aes(col = sex))+
+  theme_pubclean(base_size = 16)+
+  stat_pvalue_manual( filter(signif_results_tukey,Category  == "GO:0006306", term == "sex"),
+                      label = "{p.adj.signif}",
+                      y.position = 0.85)+
+  color_palette("npg")+
+  ylab("Enrichment Score")+
+  ggtitle("DNA Methylation")+
+  xlab("")+
+  ylim(-1,1)+
+  theme(axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 18),
+        axis.title = element_text(size =18),
+        plot.title = element_text(size =18, hjust = 0.5)) -> p_met
+
+gsva_results %>%
+  filter( Category ==  "GO:0006338") %>%
+  left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
+  rename( `GO ID` = Category, 
+          `GO Term`=TERM, 
+          Sample = sampleid, 
+          `Enrichment Score`=Enrichment_Score, 
+          Sex = sex, 
+          `Lifr genotype`=lifr_geno) %>% 
+  ggplot()+
+  aes( x = Sex,
+       y = `Enrichment Score`,
+       col = Sex)+
+  geom_boxplot(width =0.2, size = 1.1)+
+  #geom_jitter()+
+  #geom_beeswarm(aes(col = sex))+
+  theme_pubclean(base_size = 16)+
+  stat_pvalue_manual( filter(signif_results_tukey,Category  == "GO:0006338", term == "sex"),
+                      label = "{p.adj.signif}",
+                      y.position = 0.85)+
+  color_palette("npg")+
+  ylab("Enrichment Score")+
+  ggtitle("Chromatin remodeling")+
+  xlab("")+
+  ylim(-1,1)+
+  theme(axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 18),
+        axis.title = element_text(size =18),
+        plot.title = element_text(size =18, hjust = .5)) -> p_chrom
+
+gsva_results %>%
+  filter( Category ==  "GO:0042254") %>%
+  left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
+  rename( `GO ID` = Category, 
+          `GO Term`=TERM, 
+          Sample = sampleid, 
+          `Enrichment Score`=Enrichment_Score, 
+          Sex = sex, 
+          `Lifr genotype`=lifr_geno) %>% 
+  ggplot()+
+  aes( x = Sex,
+       y = `Enrichment Score`,
+       col = Sex)+
+  geom_boxplot(width =0.2, size = 1.1)+
+  #geom_jitter()+
+  #geom_beeswarm(aes(col = sex))+
+  theme_pubclean(base_size = 16)+
+  stat_pvalue_manual( filter(signif_results_tukey,Category  == "GO:0042254", term == "sex"),
+                      label = "{p.adj.signif}",
+                      y.position = 0.85)+
+  color_palette("npg")+
+  ylab("Enrichment Score")+
+  ggtitle("Ribosome biogenesis")+
+  xlab("")+
+  ylim(-1,1)+
+  theme(axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 18),
+        axis.title = element_text(size =18),
+        plot.title = element_text(size =18, hjust = .5)) -> p_ribo
+
+gsva_results %>%
+  filter( Category ==  "GO:0006471") %>%
+  left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
+  rename( `GO ID` = Category, 
+          `GO Term`=TERM, 
+          Sample = sampleid, 
+          `Enrichment Score`=Enrichment_Score, 
+          Sex = sex, 
+          `Lifr genotype`=lifr_geno) %>% 
+  ggplot()+
+  aes( x = `Lifr genotype`,
+       y =  `Enrichment Score`,
+       col = `Lifr genotype`)+
+  geom_boxplot(width =0.2, size = 1.1)+
+  #geom_jitter()+
+  #geom_beeswarm(aes(col = sex))+
+  theme_pubclean(base_size = 16)+
+  stat_pvalue_manual( filter(signif_results_tukey,Category  == "GO:0006471", term == "lifr_geno"),
+                      label = "{p.adj.signif}",
+                      y.position = c(0.85, 0.95))+
+  color_palette("Dark2")+
+  ylab("Enrichment Score")+
+  ggtitle("Protein ADP-ribosylation")+
+  xlab("")+
+  labs(col ="LIFR")+
+  ylim(-1,1)+
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 18),
+        axis.title = element_text(size =18),
+        plot.title = element_text(size =18, hjust = .5)) -> p_adp
+
+left <- ggarrange(p_met,p_chrom, p_ribo, 
+                  common.legend = TRUE, 
+                  nrow = 1,
+                  ncol = 3, 
+                  legend = "none")
+
+ggarrange(left, p_adp, 
+          nrow=1, 
+          widths = c(.8,0.4) , 
+          labels = c("D"), 
+          font.label = list( size = 20))
+
+
+```
+
+<br>
+
+```{r Figure1D_data, fig.cap="Data used to generate Figure 1D."}
+
+gsva_results %>%
+  filter( Category %in% c("GO:0006306", # DNA methylation
+                          "GO:0006338", # Chromatin remodeling
+                          "GO:0042254" # Ribosome biogenesis
+                          )) %>%
+  left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
+  select( Category, TERM, sampleid, Enrichment_Score, sex, lifr_geno) %>% 
+  left_join(
+    signif_results_tukey %>% 
+      filter( term =="sex") %>% 
+      select(Category, p.adj, p.adj.signif )
+  ) %>% 
+  rbind(
+       gsva_results %>%  
+         filter( Category == "GO:0006471") %>%  # protein ADP-ribosylation
+         left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
+         select( Category, TERM, sampleid, Enrichment_Score, sex, lifr_geno) %>% 
+         left_join(
+           signif_results_tukey %>% 
+             filter( term =="lifr_geno") %>% 
+             select(Category, p.adj, p.adj.signif )
+           )
+       ) %>% 
+  mutate( Enrichment_Score = round(Enrichment_Score, 2)) %>% 
+  select( `GO ID` = Category, 
+          `GO Term`=TERM, 
+          Sample = sampleid, 
+          `Enrichment Score`=Enrichment_Score, 
+          Sex = sex, 
+          `Lifr genotype`=lifr_geno, 
+          `Significance`=p.adj.signif) %>% 
+  create_dt()
+
+```
+
+<br>
+
+#### Table S3: Gene Set Variation Analysis results. 
+
+Biological processes and protein complexes that show significant differences between experimental groups (sex, *Lifr* genotype, or their interaction) in GSVA enrichment scores obtained from protein or transcript abundance are listed. The source of the significant effect (sex, *Lifr* genotype or their interaction) as well as the two groups being compared is included with the Tukey's HSD estimate and the adjusted p-value for each term. 
+
+
+```{r TableS3_generate, warning=FALSE, message=FALSE}
+
+signif_results_tukey %>% 
+  #left_join( ., goannot_wdef %>%  select(TERM, GOID) %>% distinct()) %>% 
+  select(Effect= term, Category, TERM,group1, group2, estimate,p.adj) %>% 
+  distinct() %>% 
+  mutate( estimate= round(estimate,2),
+          TERM = ifelse( Category %in% genes_for_complex_gsva$`Complex Name`, "Protein Complex", TERM)) %>% 
+  mutate( 
+    temp = TERM,
+    TERM = ifelse( TERM =="Protein Complex" & !is.na(TERM), Category, TERM ),
+    Category = ifelse( temp == "Protein Complex" & !is.na(TERM), temp, Category)
+          ) %>%  
+  arrange(estimate) %>% 
+  select( 
+    Effect, 
+    `Term ID` = Category,
+    `Term Name` = TERM,
+    `Group 1`= group1,
+    `Group 2`= group2,
+    `Tukey's HSD estimate` = estimate, 
+    `Adjusted p-value` = p.adj
+    ) -> tables3_sheet1
+
+
+signif_results_tukey_rna %>%
+  #left_join( ., goannot_wdef %>%  select(TERM, GOID) %>% distinct()) %>% 
+  select(Effect= term, Category, TERM,group1, group2, estimate,p.adj) %>% 
+  distinct() %>% 
+  mutate( estimate= round(estimate,2),
+          TERM = ifelse( Category %in% genes_for_complex_gsva$`Complex Name`, "Protein Complex", TERM)) %>% 
+  mutate( 
+    temp = TERM,
+    TERM = ifelse( TERM =="Protein Complex" & !is.na(TERM), Category, TERM ),
+    Category = ifelse( temp == "Protein Complex" & !is.na(TERM), temp, Category)
+          ) %>% 
+  arrange(estimate) %>% 
+  select( 
+    Effect, 
+    `Term ID` = Category,
+    `Term Name` = TERM,
+    `Group 1`= group1,
+    `Group 2`= group2,
+    `Tukey's HSD estimate` = estimate, 
+    `Adjusted p-value` = p.adj
+    ) -> tables3_sheet2
+
   
+```
+
+
+```{r TableS3_display, echo=FALSE}
+
+# 
+# writexl::write_xlsx( list( GSVA_protein = tables3_sheet1,
+#                              GSVA_transcript = tables3_sheet2),
+#                     path = here("TableS3_GSVA_results.xlsx"),
+#                     col_names = TRUE,
+#                     format_headers = TRUE
+#                     )
+
+
+xfun::embed_file(here("Table_S3.xlsx"))
+
+
+```
+
+<br>
+
+#### Over-representation analysis in proteins with high and low variation in abundance
+
+```{r ORA_var_prots, fig.cap="Over-represented biological processes and pathways in proteins with high (top 5th percentile) and low variation (bottom 5th percentile).", cache = TRUE}
+
+var_prot <- expr.esc_prot %>%
+  as_tibble(.) %>%
+  summarise_all(list(~ var(., na.rm = T))) %>% 
+  pivot_longer( all.prots$protein_id,
+                names_to = "protein_id",
+                values_to ="var") 
+
+high.var.prots <- var_prot %>%  
+  filter( var >= quantile(var, 0.95)) %>% 
+  left_join( all.prots %>%  
+               select( protein_id, mgi_symbol))
+
+low.var.prots <- var_prot %>% 
+  filter( var <= quantile(var, 0.05))%>% 
+  left_join( all.prots %>%  
+               select( protein_id, mgi_symbol))
+
+g.high.var <- gost(
+  query = high.var.prots$mgi_symbol,
+  organism = "mmusculus",
+  domain_scope = "custom",
+  custom_bg = all.prots$mgi_symbol,
+  evcodes = TRUE,
+  correction_method = "fdr"
+)
+g.high.var$result <- g.high.var$result %>% filter(term_size < 600)
+
+g.low.var <- gost(
+  query = low.var.prots$mgi_symbol,
+  organism = "mmusculus",
+  domain_scope = "custom",
+  custom_bg = all.prots$mgi_symbol,
+  evcodes = TRUE,
+  correction_method = "fdr"
+)
+g.low.var$result <- g.low.var$result %>% filter(term_size < 600)
+
+g.high.var$result %>% 
+  mutate( `Gene Set` = "High variation") %>% 
+  select(`Gene Set`, `Term Name` = term_name, source, FDR = p_value, `Term size` = term_size, Intersection = intersection_size,term_id)  %>% 
+  rbind(
+    g.low.var$result %>%
+      mutate( `Gene Set` = "Low variation") %>% 
+       select(`Gene Set`, `Term Name` = term_name, source, FDR = p_value, `Term size` = term_size, Intersection = intersection_size, term_id) 
+    ) %>% 
+  select(
+         `Gene Set`, 
+    `Data source` = source,
+    `Term ID` = term_id,
+    `Term Name` , 
+    `Term size` , 
+    `# of intersecting proteins` = Intersection,
+     FDR 
+    ) %>% 
+  mutate_if( is.numeric, formatC, digits =2) %>% 
+  create_dt()
+
+```
+
+<br>
+
+#### Figure S1F-G
+
+```{r FigureS1F_G, fig.cap ="FigureS1: (F) Mean abundance and variance plotted for all proteins (gray) with proteins identified as part of `Extracellular region` and `ECM protein` GO Terms in most variable proteins (top 5th percentile %CV), in overrepresentation analysis, highlighted in blue. (G) Mean abundance and variance plotted for all proteins with proteins identified as `REX1 Target` in TRANSFAC database in least variable proteins (bottom 5th percentile %CV), in overrepresentation analysis, highlighted in blue and REX1 (Zfp42) highlighted in purple.", fig.width=10, fig.height=5}
+
+# get proteins identified as part of "extracellular region"
+ecm_genes <- tibble(mgi_symbol = unlist(str_split((g.high.var$result %>% filter(term_name %in% c("extracellular region", "extracellular matrix")))$intersection, ","))) %>%
+  left_join(., all.prots)
+
+# get proteins identified as REX1 targets 
+rex1.genes <- tibble(mgi_symbol = unlist(str_split((g.low.var$result %>% filter(source == "TF"))$intersection[1], ","))) %>%
+  left_join(., all.prots)
+
+# get variance + mean by protein into a single data frame
+mean_prot <- expr.esc_prot %>%
+  as_tibble(.) %>%
+  summarise_all(list(~ mean(., na.rm = T))) %>% 
+  pivot_longer( all.prots$protein_id,
+                names_to = "protein_id",
+                values_to ="mean") 
+
+var_mean_prot <- var_prot %>% 
+  full_join( mean_prot) %>% 
+  left_join( all.prots)
   
-  
-  
+var_mean_prot %>% 
+  ggscatter(., 
+            x = "mean", 
+            y = "var", 
+            size = 3, 
+            alpha = 0.5,
+            col="gray",
+            yscale = "log10",
+            #xscale = "log10",
+            show.legend.text = FALSE
+            ) +
+  xlab("Mean protein abundance") +
+  ylab("Variance in protein abundance") +
+  ggtitle("REX1 Target Proteins")+
+  theme_pubclean(base_size = 18) + 
+  rremove("legend") +
+  geom_point(
+    data =   filter( var_mean_prot, ensembl_gene_id %in% rex1.genes$ensembl_gene_id) ,
+    col = "blue", alpha = 0.6, size = 3)+
+  geom_point( data = filter(var_mean_prot, mgi_symbol == "Zfp42"), col = "purple", size = 4, alpha = 1)+
+  geom_label( data = filter(var_mean_prot, mgi_symbol == "Zfp42") , label = "Rex1", nudge_x = .2, nudge_y = .2)  -> plot_rex1
+
+
+var_mean_prot %>% 
+  ggscatter(., 
+            y = "var", 
+            x = "mean", 
+            size = 3, 
+            alpha = 0.5,
+            col="gray",
+            yscale = "log10",
+            #xscale = "log10",
+            show.legend.text = FALSE
+            ) +
+  ylab("Variance in protein abundance") +
+  xlab("Mean protein abundance") +
+  theme_pubclean(base_size = 18) + 
+  rremove("legend") +
+  geom_point(
+    data =   filter( var_mean_prot, ensembl_gene_id %in% c(ecm_genes$ensembl_gene_id)) ,
+    col = "blue", alpha = 0.6, size = 3) +
+  ggtitle("Extracellular Matrix Proteins")-> plot_ecm
+
+ggarrange( plot_ecm, plot_rex1, nrow =1 ,
+           labels = c("F","G"),
+          font.label = list( size = 20)
+        )
+
+```

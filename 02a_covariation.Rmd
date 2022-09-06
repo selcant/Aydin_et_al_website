@@ -1,0 +1,1135 @@
+---
+title: "Co-variation in protein abundance, chromatin accessibility and transcript abundance"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: 
+      collapsed: false
+      smooth_scroll: false
+    df_print: paged
+    code_folding: hide
+---
+
+<style>
+p.caption {
+  font-size: 1em;
+}
+</style>
+
+
+```{r setup}
+
+# options
+options(stringsAsFactors = F)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(progress = FALSE)
+
+```
+
+<br>
+<br>
+
+### Figure 3A: Covariation of protein abundance and chromatin accessibility
+
+
+```{r Protein_atac_Seq_cor, eval = FALSE}
+# The code below is not executed because the correlation matrix is very large and takes a long time to run.
+
+# data used to calculate protein vs atac-seq correlations
+if (!exists("mm10")) mm10 <- GenomeInfoDb::Seqinfo(genome = "mm10")
+snames <- as.character(GenomicRanges::seqnames(mm10)) %>%
+  grep("^chrUn", ., value = TRUE, invert = TRUE) %>%
+  grep("_random$", ., value = TRUE, invert = TRUE) %>%
+  grep("_alt$", ., value = TRUE, invert = TRUE) %>%
+  grep("_fix$", ., value = TRUE, invert = TRUE) %>%
+  as_tibble() %>%
+  filter(!value %in% c("chrX", "chrY", "chrM")) %$% value
+autosomes <- mm10[snames]
+chrom_lens_Mb <- GenomeInfoDb::seqlengths(mm10)[snames] / 1e6
+chrom_lens_Mb_offset <- cumsum(chrom_lens_Mb) - chrom_lens_Mb
+
+binwidth <- 0.5e6
+bins <- GenomicRanges::tileGenome(autosomes, tilewidth=binwidth, cut.last.tile.in.chrom=TRUE)
+# Some bins (e.g. at end of chroms) are very small
+# Merge together any bins that are less than half binwidth with the nearest full-size bin
+small_bin_idx <- which(GenomicRanges::width(bins) < binwidth/2)
+small_bins <- bins[small_bin_idx]
+prev_bins <- bins[small_bin_idx - 1]
+#assertthat::assert_that(assertthat::are_equal(GenomicRanges::start(small_bins), GenomicRanges::end(prev_bins)+1))
+ii <- setdiff(1:length(bins), c(small_bin_idx, small_bin_idx - 1))
+untouched <- bins[ii]
+merged <- GenomicRanges::punion(small_bins, prev_bins)
+final_bins <- c(untouched, merged) %>% sort()
+
+atac_obj <- tibble(id = rownames(counts.norm2)) %>%
+  separate(id,
+    into = c("chrom", "start", "end"),
+    convert = TRUE, remove = FALSE
+  ) %>%
+  mutate(chrom = substring(chrom, 5)) %>%
+  filter(chrom != "Y", chrom != "X", chrom != "MT") %>%
+  mutate(chrom = paste0("chr", chrom)) %>%
+  mutate(midpoint = (start + end) / 2) %>%
+  mutate(start = midpoint, end = midpoint) %>%
+  GenomicRanges::GRanges(seqinfo = mm10) %>%
+  sort()
+# will be assigning each ATAC peak to one genomic bin based on midpoint
+# Find the bin that each ATAC peak falls into
+peak_bins <- GenomicRanges::findOverlaps(atac_obj, final_bins)
+# assertthat::assert_that(assertthat::are_equal(IRanges::from(peak_bins), 1:length(peak_bins))) # one bin for each peak
+
+
+prot_dat <- all.prots %>%
+   mutate(chrom = gene_chr) %>%
+    select(chrom, gene_start, gene_end, protein_id) %>%
+    mutate(midpoint=(gene_start+gene_end)/2) %>% 
+    mutate(start=midpoint, end=midpoint) %>%
+    filter(chrom != "Y", chrom != "X", chrom !="MT") %>% 
+    mutate(chrom=paste0("chr", chrom)) 
+prot_obj <- prot_dat %>%
+  GenomicRanges::GRanges(seqinfo=mm10) %>% sort()
+
+# Find the bin that each ATAC peak falls into
+prot_bins <- GenomicRanges::findOverlaps(prot_obj, final_bins)
+# assertthat::assert_that(assertthat::are_equal(IRanges::from(prot_bins), 1:length(prot_bins)))
+
+# Modify expr.both and atac.both to include only autosomes
+exprmat <- expr.esc_prot[threeway.shared.samples$sampleid, prot_obj$protein_id]
+atacmat <- t(counts.norm2[atac_obj$id, threeway.shared.samples$ATAC])
+rownames(atacmat) <- threeway.shared.samples$sampleid
+
+n_eqtl <- length(prot_obj)
+n_bins <- length(final_bins)
+cors <- cor(exprmat, atacmat, use="pairwise.complete.obs") 
+cor.prot <- cors # save to variable before getting the abs value for later.
+cors <- cors %>% abs()
+x <- apply(cors, 1, function(vals)
+    tapply(vals, INDEX=IRanges::to(peak_bins), FUN=max, na.rm=T))
+rownames(x) <- paste0("ATAC_bin", rownames(x))
+
+#low_genes <- apply(x, 2, function(vals) sum(vals > 0.2))
+#low_peaks <- apply(x, 1, function(vals) sum(vals > 0.2))
+xy <- apply(x, 1, function(vals)
+  tapply(vals, INDEX=IRanges::to(prot_bins), FUN=mean))
+rownames(xy) <- paste0("prot_bin", rownames(xy))
+genome_bins_full <- as.data.frame(final_bins) %>% as_tibble() %>%
+  dplyr::rename(bin_chrom=seqnames) %>%
+  mutate(bin_midpoint=(start+end)/2) %>%
+  mutate(bin_width=end-start, full_size=bin_width > binwidth/2) %>%
+  mutate(n=1:n()) %>%
+  filter(full_size)
+genome_bins <- genome_bins_full %>% select(bin_chrom, bin_midpoint, n)
+x2 <- as.data.frame(xy) %>% rownames_to_column("prot_bin") %>%
+  mutate(prot_bin=substring(prot_bin, 9)) %>%
+  mutate(prot_bin=as.integer(prot_bin)) %>%
+  inner_join(genome_bins, by=c("prot_bin"="n")) %>%
+  dplyr::rename(prot_bin_chrom=bin_chrom, prot_bin_midpoint=bin_midpoint) %>%
+  gather(ATAC_bin, maxcor, starts_with("ATAC")) %>%
+  as_tibble() %>% mutate_if(is.factor, as.character) %>%
+  mutate(ATAC_bin=as.integer(substring(ATAC_bin, 9))) %>%
+  inner_join(genome_bins, by=c("ATAC_bin"="n")) %>%
+  dplyr::rename(ATAC_bin_chrom=bin_chrom, ATAC_bin_midpoint=bin_midpoint)
+
+toplot <- select(x2, prot_bin, ATAC_bin, maxcor, prot_bin_chrom ) %>%
+  dplyr::rename(xpos=ATAC_bin, ypos=prot_bin) 
+toplot2 <- arrange(toplot, maxcor) %>%
+  mutate(size_scaled = scales::rescale(maxcor) + 0.1) %>%
+  mutate(cor_trimmed = ifelse(maxcor > 0.7, 0.7, maxcor)) %>%
+  mutate(alpha_scaled = scales::rescale(cor_trimmed) + 0.1)
+g5.prot <- ggplot(toplot2, aes(xpos, ypos)) +
+  geom_point(aes(color=cor_trimmed, size=size_scaled, alpha=alpha_scaled)) +
+  scale_color_distiller(palette="RdYlBu") +
+  scale_size_continuous(range=c(0.1, 3), guide="none") +
+  scale_alpha_continuous(range=c(.1, 1), guide="none") +
+  theme_classic() +
+  theme(axis.ticks=element_blank(), 
+        axis.text=element_blank(), 
+        axis.line = element_blank(),
+        axis.title.x = element_text(size = 32),
+        axis.title.y = element_text(size = 32),
+        legend.text = element_text(angle=0, hjust =0.1, size = 30),
+        legend.title = element_text(angle=0, hjust =0, vjust = 0, size = 28)) +
+  xlab("Position of ATAC peak") +
+  ylab("Position of protein coding gene") +
+  coord_cartesian(xlim=c(1, n_bins), ylim=c(1, n_bins)) +
+  guides(color=guide_colorbar(title="Correlation\n", barwidth=2.5,
+    barheight=10, bin=100))
+ggsave(g5.prot, file = here("figures/mean_sharedProt_maxATAC_05Mb_scaled.png"),width=20, height=12)
+
+
+# get the max corr protein for each ATACseq peak
+(cor.prot)%>%
+  as_tibble(rownames = "protein_id") %>%
+  pivot_longer(starts_with("peak"), names_to = "peak_id",values_to="corr") %>%
+  group_by(peak_id) %>% 
+  slice_max( abs(corr), n = 5) -> max_cor_atac_prot 
+
+t(cor.prot)%>%
+  as_tibble(rownames = "peak_id") %>% 
+  pivot_longer(starts_with("ENS"), names_to = "protein_id",values_to="corr") %>%
+  filter( abs(corr) > 0.5)  %>%
+  count(protein_id) %>%
+  left_join(all.prots) -> prot.cor.genes
+
+t(cor.prot)%>%
+  as_tibble(rownames = "peak_id") %>% 
+  pivot_longer(starts_with("ENS"), names_to = "protein_id",values_to="corr") %>%
+  filter( abs(corr) > 0.5)  %>%
+  group_by(protein_id) %>%
+  mutate(n = n()) %>%
+  filter(n > 100) %>%
+  ungroup() %>%
+  left_join(., select(all.prots, "protein_id","cor_gene"="mgi_symbol")) %>%
+  left_join(atac.peak.annots) -> prot.cor.atacpeaks
+
+save( prot.cor.genes,prot.cor.atacpeaks,max_cor_atac_prot, file = here( "_data/ATAC_prot_cor_data.RData"))
+
+
+```
+
+
+```{r Figure3A, fig.cap="Figure 3A: ID1 protein abundance shows high correlation to many chromatin regions across the genome. Circos plot showing ATAC-seq peaks where chromatin accessibility is positively (red) and negatively (blue) correlated with ID1 protein abundance (n = 112, abs(correlation) >0.5).", fig.height=6, fig.width=6}
+
+
+load(here("../pQTL_website/_data/ATAC_prot_cor_data.RData"))
+
+
+library(circlize)
+
+prot.cor.atacpeaks %>%
+  filter(n > 100) %>%
+  #filter(!cor_gene %in% (filter(rna.cor.genes, n > 50))$mgi_symbol) %>%
+  select(cor_gene, peak_id, corr) %>%
+  filter( cor_gene == "Id1") %>%
+  separate( peak_id, into = c("atac_chr","peak_start","peak_end"), remove = FALSE, sep="_") %>% 
+  mutate( atac_chr = gsub("peak","chr",atac_chr),
+          peak_start = as.numeric(peak_start),
+          peak_end = as.numeric(peak_end),
+          value = 1) %>% 
+  # adding Id1 gene_start and gene_end
+  left_join(., select(all.genes, mgi_symbol, gene_start,gene_end, gene_chr), 
+            by =c("cor_gene"="mgi_symbol")) %>% 
+  mutate( gene_chr = paste0("chr",gene_chr) ) -> id1_cor_peaks
+
+# atacseq peaks
+id1_cor_peaks %>%  
+  select( chr = atac_chr, start = peak_start, end = peak_end, Correlation = corr) %>% 
+  mutate( start = as.integer(start),
+          end = as.integer(end)
+          )-> id1_atac_peaks
+#id1
+id1_cor_peaks %>%  
+  select( chr = gene_chr, start = gene_start, end = gene_end) %>% 
+  mutate( start = as.integer(start),
+          end = as.integer(end)
+          )  -> id1_gene
+
+sectors <- tibble( chr = paste0("chr",chroms),
+                   start = 0,
+                   end = chrom_lens)
+
+circos.par(start.degree = 90, gap.degree= 1)
+circos.genomicInitialize(sectors, plotType = NULL)
+circos.genomicTrack(id1_atac_peaks,
+                    ylim = c(0,1),
+                    stack = TRUE,
+    panel.fun = function(region, value, ...) {
+      i = getI(...)
+      circos.genomicRect(region, value,
+                           col = ifelse(value[[1]] > 0, "red", "blue") ,
+                           border = ifelse(value[[1]] > 0, "red", "blue"))
+}, track.height = 0.1, bg.border = NA)
+circos.genomicTrack(stack = TRUE,
+                    ylim = c(1,2),
+                    panel.fun = function(x, y,...) {
+                      i = getI(...)
+                      chr = gsub("chr","",CELL_META$sector.index)
+                      xlim = CELL_META$xlim
+                      ylim = CELL_META$ylim
+                      circos.rect(xlim[1], 0.5, xlim[2], 1.5, col = "black")
+                      circos.text(mean(xlim),1, chr, cex = 1.5, col = "white",
+                                  facing = "inside", niceFacing = TRUE)
+}, track.height = 0.15, bg.border = NA)
+circos.genomicLabels( distinct(id1_gene),
+                      labels = "ID1", 
+                      labels.side = "outside", 
+                      padding = 0.01, 
+                      connection_height = mm_h(0.1),
+                      line_lwd = 0,
+                      cex = 1)
+circos.genomicLink(id1_gene,
+                   id1_atac_peaks,
+                   border = "black" )
+circos.clear()
+
+```
+
+<br>
+
+
+```{r Table_prot_atac_cor1, fig.cap = "Data used in Figure 3A to generate the genomic regions in the circos plot."}
+
+id1_atac_peaks %>% 
+  mutate_if( is.numeric, round ,2) %>% 
+  create_dt()
+
+```
+
+```{r Table_prot_atac_cor2, fig.cap = "Data used in Figure 3A to add ID1 gene annotation."}
+
+id1_gene %>% 
+  distinct() %>% 
+  DT::datatable(.,
+                extensions = 'Buttons',
+                rownames = FALSE, 
+                #filter="top",
+                options = list(dom = 'Bt',
+                               buttons = c('copy'),
+                               pageLength = 5, 
+                               scrollX= TRUE
+                               ))
+
+```
+
+<br>
+
+#### Figure S3A: Correlation between protein abundance and chromatin accessibility across the genome
+
+```{r FigureS3A, fig.cap="Figure 3A: A heatmap of Pearson correlation coefficients between protein abundance and chromatin accessibility across the genome. Proteins encoded on the sex chromosomes were excluded from the analysis to limit sex effects due to X gene dosage. Correlation between all autosomal proteins and accessibility at ATAC-seq peaks were calculated. For plotting, proteins and chromatin regions are grouped in 5 Kb bins and the points are colored and sized by the maximum correlation value in each bin."}
+
+knitr::include_graphics( here("mean_sharedProt_maxATAC_05Mb_scaled.png"))
+
+```
+
+<br>
+
+#### List of chromatin regions showing high correlation to protein abundance across the genome
+
+```{r, fig.cap="Full list of chromatin regions that show high correlation ( abs(cor) >0.5) to proteins across the genome with annotations."}
+
+prot.cor.atacpeaks %>%
+  filter(n > 100) %>%
+  #filter(!cor_gene %in% (filter(rna.cor.genes, n > 50))$mgi_symbol) %>%
+  select(cor_gene, peak_id, corr, annotation, mgi_symbol, gene_start, gene_end, gene_chr, n) %>%
+  rename(`# of correalated ATAC-seq peaks` = n) %>%
+  mutate(corr = formatC(corr, format = "g", digits = 2)) %>%
+  group_by(peak_id) %>%
+  mutate(n_gene = n()) %>%
+  select(cor_gene, peak_id, corr, annotation, mgi_symbol, n_gene, `# of correalated ATAC-seq peaks`) %>%
+  ungroup() %>%
+  group_by(cor_gene) %>%
+  ungroup() %>%
+  distinct() %>%
+  mutate( cor_gene = toupper(cor_gene)) %>% 
+  select( `Protein`= (cor_gene),
+          `Peak id` = peak_id,
+          `Correlation` = corr,
+          `Peak annotation (function)` = annotation, 
+          `Peak annotation (gene)` = mgi_symbol,
+          `# of correalated ATAC-seq peaks`,
+          `# of correalated proteins` = n_gene
+         ) %>% 
+  create_dt()
+
+
+```
+
+<br>
+
+#### Over-representation of transcription binding sites in chromatin regions with high correlation to protein abundance across the genome
+
+```{r ORA_ATAC_seq_peaks, message=FALSE, warning=FALSE, fig.cap="Over-represented transcription factor binding sites in chromatin regions showing high correlation to abundance of proteins seen as horizontal bands in Figure S3A."}
+
+background_atac_peaks <-  tibble( peak_id = atac.peak.annots_full$peak_id ) %>%
+  separate( peak_id, into = c("Chr", "Start","End"), remove = FALSE) %>%
+  mutate( Chr = gsub("peak","chr",Chr)) %>% 
+  makeGRangesFromDataFrame(.,
+                               keep.extra.columns = F,
+                               seqnames.field = c("Chr"),
+                               start.field = "Start",
+                               end.field = "End")
+
+prot.cor.atacpeaks %>%
+  filter(n > 100) %>%
+  ungroup() %>%
+  filter( corr > 0) %>% 
+  left_join(., select(all.prots, "cor_gene_id" = "protein_id", "cor_gene" = "mgi_symbol")) %>%
+  left_join(atac.peak.annots) %>%
+  select(cor_gene_id, cor_gene, peak_id, corr, annotation, mgi_symbol) %>%
+  mutate(corr = formatC(corr, format = "g", digits = 2)) %>%
+  arrange(cor_gene) %>%
+  filter(!is.na(mgi_symbol)) %>%
+  as_tibble() %>%
+  select(cor_gene, peak_id) %>%
+  #filter(cor_gene =="Ahdc1") %>%
+  separate( peak_id, into = c("Chr", "Start","End"), remove = FALSE) %>%
+  mutate( Chr = gsub("peak","chr",Chr)) %>%
+  group_by(cor_gene) %>%
+  nest() %>%
+  mutate(geneSet = map(data, function(df) {
+    genes = makeGRangesFromDataFrame( data,
+                               keep.extra.columns = F,
+                               seqnames.field = c("Chr"),
+                               start.field = "Start",
+                               end.field = "End")
+    return(genes)
+
+  })) %>%
+  select(-data) %>%
+  ungroup() %>%
+  mutate( userSet = seq(1:n()), type ="pos")-> all_prot_atac_peaks_pos
+
+prot.cor.atacpeaks %>%
+  filter(n > 100) %>%
+  ungroup() %>%
+  filter( corr < 0) %>% 
+  #filter(!cor_gene %in% (filter(rna.cor.genes, n > 50))$mgi_symbol) %>%
+  left_join(., select(all.prots, "cor_gene_id" = "protein_id", "cor_gene" = "mgi_symbol")) %>%
+  left_join(atac.peak.annots) %>%
+  select(cor_gene_id, cor_gene, peak_id, corr, annotation, mgi_symbol) %>%
+  mutate(corr = formatC(corr, format = "g", digits = 2)) %>%
+  arrange(cor_gene) %>%
+  filter(!is.na(mgi_symbol)) %>%
+  as_tibble() %>%
+  select(cor_gene, peak_id) %>%
+  #filter(cor_gene =="Ahdc1") %>%
+  separate( peak_id, into = c("Chr", "Start","End"), remove = FALSE) %>%
+  mutate( Chr = gsub("peak","chr",Chr)) %>%
+  group_by(cor_gene) %>%
+  nest() %>%
+  mutate(geneSet = map(data, function(df) {
+    genes = makeGRangesFromDataFrame( data,
+                               keep.extra.columns = F,
+                               seqnames.field = c("Chr"),
+                               start.field = "Start",
+                               end.field = "End")
+    return(genes)
+
+  })) %>%
+  select(-data) %>%
+  ungroup() %>%
+  mutate( userSet = seq(1:n()), type ="neg")-> all_prot_atac_peaks_neg
+
+genesSets_pos <- GRangesList(c(all_prot_atac_peaks_pos$geneSet)
+)
+genesSets_neg <- GRangesList(c(all_prot_atac_peaks_neg$geneSet)
+)
+
+ora_prot_unique_atac_peaks_pos <- runLOLA(genesSets_pos,
+                                  background_atac_peaks,
+                                  regionDB,
+                                  cores=1)
+
+ora_prot_unique_atac_peaks_neg <- runLOLA(genesSets_neg,
+                                  background_atac_peaks,
+                                  regionDB,
+                                  cores=1)
+
+ora_prot_unique_atac_peaks_pos$qValue <- (qvalue( 10^(-ora_prot_unique_atac_peaks_pos$pValueLog )))$qvalues
+
+ora_prot_unique_atac_peaks_neg$qValue <- (qvalue( 10^(-ora_prot_unique_atac_peaks_neg$pValueLog )))$qvalues
+
+
+ora_prot_unique_atac_peaks_neg %>% 
+  left_join( select(all_prot_atac_peaks_neg, userSet, cor_gene) ) %>% 
+  filter( qValue < 0.05) %>%
+  filter( cellType %in% c("Embryonic Stem Cell", "ES-Bruce4","Embyonic stem cell","Embryonic Stem Cells", "Embryonic stem cells", "embryonic stem cells","embryonic stem cell") ) %>% 
+  group_by(cor_gene ) %>% 
+  mutate( Genes = paste( unique(antibody), collapse = ", "),
+          n = n_distinct(antibody)) %>%
+  arrange( desc(n)) %>% 
+  mutate( cor_gene = toupper(cor_gene)) %>% 
+  select( `Protein`= (cor_gene),
+          `Overrepresented TF binding sites in negatively correlated ATAC-seq peaks` = Genes) %>%
+  distinct() %>% 
+  full_join(
+    ora_prot_unique_atac_peaks_pos %>% 
+      left_join( select(all_prot_atac_peaks_pos, userSet, cor_gene) ) %>% 
+      filter( qValue < 0.05) %>%
+      filter( cellType %in% c("Embryonic Stem Cell", "ES-Bruce4","Embyonic stem cell","Embryonic Stem Cells", "Embryonic stem cells", "embryonic stem cells","embryonic stem cell") ) %>% 
+      group_by( cor_gene) %>% 
+      mutate( Genes = paste( unique(antibody), collapse = ", "),
+          n = n_distinct(antibody)) %>%
+      arrange( desc(n)) %>% 
+      mutate(cor_gene = toupper(cor_gene)) %>% 
+      select( `Protein`= (cor_gene),
+          `Overrepresented TF binding sites in positively correlated ATAC-seq peaks` = Genes) %>%
+      distinct()
+  ) -> all_lola_results
+
+all_lola_results %>% 
+  create_dt()
+
+```
+
+<br>
+
+#### Table S4: List of proteins with high correlation to ATAC-seq peaks genome wide. 
+
+The table includes additional annotations such as cellular location, Interpro domains, over-represented transcription factor binding sites in ATAC-seq peaks with negative and positive correlations, and relevant references highlighting roles in pluripotency regulation for each protein.
+
+```{r TableS4, eval = FALSE}
+
+# get the list of proteins that show high correlation (abs(cor)>0.5) to at least 100 ATAC-seq peaks
+all_annot_v98_wGO <- read_tsv( here("../pQTL_website/_data","ensembl_gene_annotations_v98_wGO.txt")) %>% 
+rename( "ensembl_gene_id" = "Gene stable ID",
+          "protein_id" = "Protein stable ID",
+          "gene_start" = "Gene start (bp)",
+          "gene_end" = "Gene end (bp)",
+          "gene_chr" = "Chromosome/scaffold name",
+          "mgi_symbol" = "MGI symbol",
+          "gene_biotype" = "Gene type",
+        "GO_term_name"="GO term name",
+        "GO_term_def" = "GO term definition",
+        "GO_domain" = "GO domain",
+        "GO_ID"= "GO term accession"
+        )
+
+all_annot_w98_winterpro <- read_tsv( here("../pQTL_website/_data","ensembl_v98_interpro.txt")) %>% 
+  rename( "ensembl_gene_id" = "Gene stable ID",
+          "protein_id" = "Protein stable ID") %>% 
+  select(protein_id, interpro_domains =`Interpro Description` ) %>% 
+  distinct()
+  
+
+prot.cor.atacpeaks %>% 
+  filter(n > 100) %>%
+  ungroup() %>%
+  mutate( cor_type = ifelse( corr > 0, "Positive", "Negative")) %>% 
+  group_by( cor_gene, cor_type) %>% 
+  count() %>% 
+  pivot_wider( cor_gene, names_from = "cor_type", values_from = "n") %>% 
+  mutate( sum = Positive + Negative) %>% 
+  mutate( `Number of correlated ATAC-seq peaks (positive / negative)` = str_c(sum, " (",Positive,"/", Negative,") ")) %>% 
+  select( cor_gene,`Number of correlated ATAC-seq peaks (positive / negative)`)  -> peak_nums
+
+prot.cor.genes %>% 
+  filter(n > 100) %>% 
+  # add cellular location 
+  left_join(   all_annot_v98_wGO %>%
+               filter( GO_domain =="cellular_component") %>% 
+               select( protein_id, 
+                       GO_term_name
+                       )
+             ) %>% 
+  group_by(mgi_symbol, protein_id, gene_chr, n) %>% 
+  summarise(across(GO_term_name, str_c, collapse=" ; ")) -> prot_locations 
+  
+prot.cor.genes %>% 
+  filter(n > 100) %>% 
+  # add interpro domains 
+  left_join( all_annot_w98_winterpro) %>% 
+  group_by(mgi_symbol, protein_id, gene_chr, n) %>% 
+  summarise(across(interpro_domains, str_c, collapse=" ; ")) -> prot_interpro_doms
+
+peak_nums %>% 
+  rename(mgi_symbol = cor_gene) %>% 
+  left_join( prot_locations) %>% 
+  left_join( prot_interpro_doms) %>% 
+  mutate(mgi_symbol = toupper(mgi_symbol),
+         gene_chr = as.numeric(gene_chr)) %>% 
+  select(`Protein ID` = protein_id, 
+         `Protein` = (mgi_symbol), 
+         `Protein location (Chr)` = gene_chr, 
+         `Cellular location` = GO_term_name,
+         `Interpro domain` = interpro_domains,
+         `Number of correlated ATAC-seq peaks (positive / negative)`
+         ) %>%
+  left_join(
+    all_lola_results
+  ) %>% 
+  # Ahdc1 annotation is missing, fixing that
+  mutate( `Cellular location` = ifelse( Protein =="AHDC1", "nucleus", `Cellular location`)) %>% 
+  # add observed at the transcript level?
+  mutate(`Observed at the transctript level?` = ifelse( 
+    Protein %in% c("ARHGEF1","GJB3","NAPRT", "OOEP", "PHLDA2", "PUS7L"),
+    "Yes", "No")) %>% 
+  # add references
+  mutate( 
+    `Published role in pluripotency [ref]` = case_when(
+      Protein == "AHDC1"~"Moreira S, Seo C, Gordon V, Xing S, Wu R, Polena E, et al. Endogenous BioID elucidates TCF7L1 interactome modulation upon GSK-3 inhibition in mouse ESCs. 2018 Oct p. 431023. doi:10.1101/431023",
+      Protein =="ID1"~"Romero-Lanman, E.E., Pavlovic, S., Amlani, B., Chin, Y., and Benezra, R. (2012). Id1 Maintains Embryonic Stem Cell Self-Renewal by Up-Regulation of Nanog and Repression of Brachyury Expression. Stem Cells Dev. 21, 384–393.",
+      Protein =="UHRF2"~"Walker E, Chang WY, Hunkapiller J, Cagney G, Garcha K, Torchia J, Krogan NJ, Reiter JF, Stanford WL. Polycomb-like 2 associates with PRC2 and regulates transcriptional networks during mouse embryonic stem cell self-renewal and differentiation. Cell Stem Cell. 2010 Feb 5;6(2):153-66. doi: 10.1016/j.stem.2009.12.014. PMID: 20144788; PMCID: PMC2849004."
+    )) -> table_s4
+
+writexl::write_xlsx( table_s4,
+                    path = here("TableS4_Proteins_w_corr_toATACseq.xlsx"),
+                    col_names = TRUE,
+                    format_headers = TRUE
+                    )
+
+```
+
+```{r TableS4_display,  echo =FALSE}
+
+xfun::embed_file(here("Table_S4.xlsx"))
+
+```
+
+<br>
+<br>
+
+### Figure 3B: Covariation of proteome and transcriptome across samples
+
+```{r Figure3B, message=FALSE, warning=FALSE, cache=TRUE,fig.cap = "Figure 3B: DO mESCs show a wide range of correlations between their transcriptome and proteome. Histogram of Pearson correlation coefficients between the transcriptome and proteome of DO mESC cell lines with matching genotypes (n = 174).", fig.height=3, fig.width=5}
+
+shared.prot.names <- shared.genes %>%
+  group_by(ensembl_gene_id) %>%
+  mutate(new_symbol = paste0(mgi_symbol, "_", 1:n()),
+         new_gene_id = paste0(ensembl_gene_id, "_", 1:n()))
+
+shared_prot_mat <-  t(exprZ.esc_prot[shared.samples, shared.prot.names$protein_id])
+colnames(shared_prot_mat) <- paste0(colnames(shared_prot_mat),"_protein")
+shared_rna_mat <-  t(exprZ.esc_rna[shared.samples, shared.prot.names$ensembl_gene_id])
+colnames(shared_rna_mat) <- paste0(colnames(shared_rna_mat),"_rna")
+
+prot_rna_sample_cor <- rcorr( x = shared_prot_mat,
+                         y = shared_rna_mat,
+                         type = "spearman")
+
+
+prot_rna_sample_cor_df <- as_tibble( prot_rna_sample_cor$r[colnames(shared_prot_mat), colnames(shared_rna_mat)],
+                            rownames = "protein_sample") %>%
+  pivot_longer( colnames(shared_rna_mat), names_to = "rna_sample", values_to = "r") %>%
+  inner_join( (as_tibble( prot_rna_sample_cor$P[colnames(shared_prot_mat), colnames(shared_rna_mat)],
+                            rownames = "protein_sample") %>%
+      pivot_longer( colnames(shared_rna_mat), names_to = "rna_sample", values_to = "p_val") ) )
+
+
+prot_rna_sample_cor_df %>%
+  mutate( sampleid_prot = gsub("_protein","",protein_sample),
+          sampleid_rna = gsub("_rna","", rna_sample)) %>%
+  filter( sampleid_rna == sampleid_prot) %>% summarize( med_r = median(r)) -> median_cor_rna_prot
+
+prot_rna_sample_cor_df %>%
+  mutate( sampleid_prot = gsub("_protein","",protein_sample),
+          sampleid_rna = gsub("_rna","", rna_sample)) %>%
+  filter( sampleid_rna == sampleid_prot) %>%
+  rename( `Sample id` = sampleid_prot,
+          `Correlation` = r) %>%
+  ggplot() +
+  aes(x = Correlation) +
+  geom_histogram( show.legend = F, binwidth = 0.01, alpha = 0.8) +
+  geom_vline( aes(xintercept = median(Correlation,na.rm=T)), color = "black", linetype = "dashed", size = 1 )+
+  annotate( "text",
+            x = median_cor_rna_prot$med_r + 0.12,
+            label = paste0("Median = ",round(median_cor_rna_prot$med_r,2)), 
+            y = 13,
+            size = 5
+  )+
+  xlab("Cell line correlation") +
+  ylab("Count") +
+  #scale_fill_viridis_d(direction = -1, limits = c("ns", "p < 0.05", "p < 0.005", "p < 5e-10")) +
+  #labs(fill = "Significance") +
+  theme_pubclean(base_size = 20)+
+  xlim(0,0.6)+
+  ylim(0,15)
+
+```
+
+<br>
+
+```{r Figure3B_data, fig.cap="Correlation values used to generate Figure 3B."}
+
+prot_rna_sample_cor_df %>%
+  mutate( sampleid_prot = gsub("_protein","",protein_sample),
+          sampleid_rna = gsub("_rna","", rna_sample)) %>%
+  filter( sampleid_rna == sampleid_prot) %>%
+  select( `Sample id` = sampleid_prot, 
+          `Correlation` = r) %>% 
+  mutate_if(is.numeric, round ,2) %>% 
+  create_dt()
+
+```
+
+<br>
+
+#### Figure S3B-C: Variation in transcript and protein abundance
+
+```{r FigureS3B_C, fig.cap = "Figure S3: (B, C) Scatterplots showing mean and coefficient of variation (% CV) for transcript and protein abundance for genes with both measurements (n = 7,241).", fig.width=10, fig.height=5, warning=FALSE, message=FALSE}
+
+# get mean + %cv for protein abundance
+var_prot <- expr.esc_prot %>%
+  as_tibble(.) %>%
+  summarise_all(list(~ var(., na.rm = T))) %>%
+  pivot_longer(everything(),
+                names_to = "protein_id",
+                values_to ="var.prot") 
+
+mean_prot <- expr.esc_prot %>%
+  as_tibble(.) %>%
+  summarise_all(list(~ mean(., na.rm = T))) %>% 
+  pivot_longer( everything(),
+                names_to = "protein_id",
+                values_to ="mean.prot") 
+
+var_prot %>% 
+  full_join( mean_prot) %>% 
+  mutate(sd.prot = sqrt(var.prot)) %>%
+  mutate(cv.prot = 100 * sd.prot / (mean.prot)) -> all_var_prot
+
+# get mean + %cv for transcript abundance
+var_rna <- expr.esc_rna %>%
+  as_tibble(.) %>%
+  summarise_all(list(~ var(., na.rm = T))) %>%
+  pivot_longer( everything(),
+                names_to = "ensembl_gene_id",
+                values_to ="var.rna") 
+
+mean_rna <- expr.esc_rna %>%
+  as_tibble(.) %>%
+  summarise_all(list(~ mean(., na.rm = T))) %>% 
+  pivot_longer( everything(),
+                names_to = "ensembl_gene_id",
+                values_to ="mean.rna") 
+
+var_rna %>% 
+  full_join( mean_rna) %>% 
+  left_join( all.genes) %>% 
+  mutate(sd.rna = sqrt(var.rna)) %>%
+  mutate(cv.rna = 100 * sd.rna / (mean.rna)) -> all_var_rna
+
+# join transcript + protein variation
+all_var_rna %>% 
+  left_join( shared.genes) %>% 
+  inner_join(all_var_prot %>% 
+               left_join(shared.genes)) -> all_var
+
+# plotting figures S3b-c
+all_var %>% 
+  ggscatter(
+    .,
+    x = "mean.prot", y = "mean.rna", size = 3, alpha = 0.6,
+  add = "reg.line", # Add regression line
+  conf.int = TRUE, # Add confidence interval
+
+  add.params = list(color = "blue", fill = "lightgray"), show.legend.text = FALSE,
+  yscale = "log10"
+) +
+  stat_cor(method = "pearson", label.x = 10, label.y = 6.1) + # Add correlation coefficient
+  # stat_cor(  aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")),
+  #            label.x = 0.65, label.y = 6) +# Add regression R2
+  xlab("Mean protein abundance") +
+  ylab("Mean transcript abundance") +
+  theme_pubclean(base_size = 18) + rremove("legend") -> figure_s3b
+figure_s3b <- ggpar(figure_s3b, xlim = c(5, 15))
+
+all_var %>% 
+  ggscatter(. ,
+    x = "cv.prot", y = "cv.rna", size = 3, alpha = 0.6,
+    add = "reg.line", # Add regression line
+    conf.int = TRUE, # Add confidence interval
+  
+    add.params = list(color = "blue", fill = "lightgray"), show.legend.text = FALSE,
+    yscale = "log10", 
+    xscale = "log10"
+  ) +
+    stat_cor(method = "pearson", label.x = 0.9, label.y = 3.02) + # Add correlation coefficient
+    # stat_cor(  aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")),
+    #            label.x = -0.01, label.y = 3) +# Add regression R2
+    xlab("% CV protein abundance") +
+    ylab("% CV transcript abundance") +
+    theme_pubclean(base_size = 18) + rremove("legend") -> figure_s3c
+figure_s3c <- ggpar( figure_s3c, xlim= c(1, 50), ylim = c(5, 1000))
+
+ggarrange(figure_s3b, 
+                      figure_s3c, 
+                      nrow = 1,
+                      labels = c("B","C"), 
+                      font.label = list( size = 20)
+                      )
+
+
+```
+
+<br>
+
+#### Genes with difference in variation in transcript and protein abundance
+
+```{r Table_prot_rna_var, message=FALSE, warning=FALSE, fig.cap = "Genes with high variation in transcript and low variation in protein abundance are over-represented in ribosomal proteins.", cache = TRUE}
+
+# genes with high variation in protein abundance and low variation in transcript abundance
+all_var %>%
+  filter( !is.na(cv.rna), !is.na(cv.prot)) %>%
+  filter( cv.prot > quantile(cv.prot, 0.75) & cv.rna < quantile(cv.rna, 0.25) ) %>%
+  left_join(all.prots) -> rev_var_prots
+
+# genes with high variation in transcript abundance and low variation in protein abundance
+all_var %>%
+  filter( !is.na(cv.rna), !is.na(cv.prot)) %>%
+  filter( cv.prot < quantile(cv.prot, 0.25) & cv.rna > quantile(cv.rna, 0.75) ) %>%
+  left_join(all.prots) -> rev_var_prots2
+
+
+ora_rev_var_prots <- gost( query = unique(rev_var_prots$mgi_symbol),
+                     organism = "mmusculus",
+                     domain_scope = "custom",
+                     custom_bg = shared.genes$mgi_symbol,
+                     evcodes = TRUE,
+  correction_method = "fdr"
+                     )
+ora_rev_var_prots$result <- filter( ora_rev_var_prots$result, term_size < 600) # nothing over-represented, empty! 
+
+ora_rev_var_prots2 <- gost( query = unique(rev_var_prots2$mgi_symbol),
+                     organism = "mmusculus",
+                     domain_scope = "custom",
+                     custom_bg = shared.genes$mgi_symbol,
+                     evcodes = TRUE,
+  correction_method = "fdr"
+                     )
+ora_rev_var_prots2$result <- filter( ora_rev_var_prots2$result, term_size < 600)
+
+
+ora_rev_var_prots2$result %>%
+ select(
+    `Data source` = source,
+    `Term ID` = term_id,
+    `Term Name` = term_name, 
+    `Term size` = term_size, 
+    `# of intersecting proteins` = intersection_size,
+     FDR = p_value
+    ) %>% 
+  mutate_if( is.numeric, formatC, digits =2) %>% 
+  create_dt()
+
+```
+
+
+<br>
+
+#### Figure S3D
+
+```{r FigureS3D, fig.cap="Figure S3D: Genetically identical cell lines show significantly higher correlation than what is expected by chance between the transcriptome and proteome. Violin plots overlaid with boxplots depicting the distribution of Pearson correlation coefficients between the transcriptome and proteome of genetically identical mESCs (blue) and the null distribution generated through 1000 permutations where the sample names are randomized (black).", warning=FALSE, message=FALSE, fig.height=5, fig.width=4}
+
+
+# The code below is used to generate the null distribution.
+# It is commented out and loaded from the saved Rdata file because it takes too long to run within the script. 
+# sample_cor <- c()
+# for( i in 1:1000){
+#   # randomizing the sample names 1000 times and getting correlations
+#   
+#   shared_prot_mat <-  t(exprZ.esc_prot[shared.samples, shared.prot.names$protein_id])
+#   # randomize the sample names
+#   colnames(shared_prot_mat) <- paste0( sample(colnames(shared_prot_mat), ncol(shared_prot_mat)),"_protein")
+# 
+#   shared_rna_mat <-  t(exprZ.esc_rna[shared.samples, shared.prot.names$ensembl_gene_id])
+#   # randomize the sample names
+#   colnames(shared_rna_mat) <- paste0( sample(colnames(shared_rna_mat), ncol(shared_rna_mat)),"_rna")
+# 
+#   measure.cor.df <- rcorr( x = shared_prot_mat,
+#                          y = shared_rna_mat,
+#                          type = "spearman")
+#   
+#   sample_cor[[i]] <- as_tibble( measure.cor.df$r[colnames(shared_prot_mat), colnames(shared_rna_mat)],
+#                             rownames = "protein_sample") %>%
+#   pivot_longer( colnames(shared_rna_mat), names_to = "rna_sample", values_to = "r") %>%
+#   inner_join( (as_tibble( measure.cor.df$P[colnames(shared_prot_mat), colnames(shared_rna_mat)],
+#                             rownames = "protein_sample") %>%
+#       pivot_longer( colnames(shared_rna_mat), names_to = "rna_sample", values_to = "p_val") ) ) %>% 
+#     mutate( n = i)
+# 
+# }
+# 
+# save(sample_cor, file = here("_data","rna_prot_sample_cor_perm.RData"))
+
+
+load(here("../pQTL_website/_data","rna_prot_sample_cor_perm.RData"))
+
+sample_cor %>% 
+  enframe() %>% 
+  unnest(value) %>% 
+  mutate( protein_sample = gsub("_protein","",protein_sample) ,
+          rna_sample = gsub("_rna","",rna_sample)) %>% 
+  filter( protein_sample == rna_sample) -> null_sample_cor_dist
+
+prot_rna_sample_cor_df %>%
+  mutate( sampleid_prot = gsub("_protein","",protein_sample),
+          sampleid_rna = gsub("_rna","", rna_sample)) %>%
+  filter( sampleid_rna == sampleid_prot) -> real_sample_cor_dist
+
+null_sample_cor_dist %>% 
+  mutate( type = "Null") %>% 
+  select( type, r) %>% 
+  rbind( real_sample_cor_dist %>% 
+           mutate( type = "Real") %>% 
+           select( type, r)) %>% 
+  ggplot()+
+  aes( x = type,
+       y = r, 
+       col = type )+
+  geom_violin( show.legend = F)+
+  geom_boxplot(width = 0.1, show.legend = F)+
+  scale_color_manual( values = c("black","blue"))+
+  theme_pubclean(base_size = 18)+
+  theme(legend.position="none")+
+  ylab("Correlation")+
+  xlab("Distribution")+
+  stat_compare_means( label.y = 0.62, label.x = 1.15)+
+  ylim(-0.5,.65) -> fig_s3d
+  
+ggarrange(fig_s3d, 
+          labels = "D",
+          font.label = list( size = 20)
+                      )
+
+```
+
+
+<br>
+<br>
+
+### Figure 3C: Covariation of protein and transcript abundance across genes
+
+```{r Figure3C, fig.cap = "Figure 3C: Genes show variable agreement between transcript and protein abundance in DO mESCs. Histogram depicting the distribution of pairwise Pearson correlation coefficients between transcript and protein abundance of genes with characteristic GO terms overrepresented in each category annotated underneath in matching colors (green: significantly positively correlated, orange: significantly negatively correlated, purple: genes with little or no correlation).", warning=FALSE, message=FALSE, fig.width=10, fig.height=6, cache = TRUE, cache.lazy=FALSE}
+
+
+# get gene names for all protein ids
+shared.prot.names <- shared.genes %>%
+  group_by(ensembl_gene_id) %>%
+  mutate(new_symbol = paste0(mgi_symbol, "_", 1:n()),
+         new_gene_id = paste0(ensembl_gene_id, "_", 1:n()))
+
+# change id's into gene symbols
+shared_prot_mat2 <-  (exprZ.esc_prot[shared.samples, shared.prot.names$protein_id])
+shared_rna_mat2 <-  (exprZ.esc_rna[shared.samples, shared.prot.names$ensembl_gene_id])
+
+# get gene level correlations
+prot_rna_gene_cor <- rcorr( x = shared_prot_mat2,
+                         y = shared_rna_mat2,
+                         type = "pearson")
+
+# convert gene level correlations to data frame 
+prot_rna_gene_cor_df <- tibble( r =diag(prot_rna_gene_cor$r[colnames(shared_prot_mat2), colnames(shared_rna_mat2)]),
+                       p_val = diag(prot_rna_gene_cor$P[colnames(shared_prot_mat2), colnames(shared_rna_mat2)]),
+                       n = diag(prot_rna_gene_cor$n[colnames(shared_prot_mat2), colnames(shared_rna_mat2)]),
+                       protein_id = colnames(shared_prot_mat2),
+                       ensembl_gene_id = colnames(shared_rna_mat2)
+                       ) %>%
+  left_join(., shared.prot.names) %>%
+  mutate(p_adj = p.adjust(p_val, method = "BH")) %>%
+  mutate( cor = r) %>%
+  arrange((desc(cor))) %>%
+  mutate(rank = seq(1:n()))
+
+# get significantly negatively and positively correlated genes and genes with not correlation (abs(cor) <0.05).
+neg_cor <- prot_rna_gene_cor_df %>%
+  filter( cor < 0, p_adj < 0.05)
+
+pos_cor <- prot_rna_gene_cor_df %>%
+  filter( cor > 0, p_adj < 0.05) %>%
+  arrange( desc(cor) )
+
+no_cor <- prot_rna_gene_cor_df %>%
+  filter( abs(cor) < 0.05) 
+
+# over-representation analysis with each category
+ora_neg_cor <- gost( query = neg_cor$mgi_symbol,
+                     organism = "mmusculus",
+                     domain_scope = "custom",
+                     custom_bg = prot_rna_gene_cor_df$mgi_symbol,
+                     evcodes = TRUE,
+  correction_method = "fdr"
+                     )
+ora_neg_cor$result <- filter( ora_neg_cor$result, term_size < 600)
+
+ora_pos_cor <- gost( query = pos_cor$mgi_symbol,
+                     organism = "mmusculus",
+                     domain_scope = "custom",
+                     custom_bg = prot_rna_gene_cor_df$mgi_symbol,
+                     evcodes = TRUE,
+  correction_method = "fdr"
+                     )
+ora_pos_cor$result <- filter( ora_pos_cor$result, term_size < 600)
+
+ora_no_cor <- gost( query = no_cor$mgi_symbol,
+                     organism = "mmusculus",
+                     domain_scope = "custom",
+                     custom_bg = prot_rna_gene_cor_df$mgi_symbol,
+                     evcodes = TRUE,
+  correction_method = "fdr"
+                     )
+ora_no_cor$result <- filter( ora_no_cor$result, term_size < 600)
+
+# merge all ORA results into one data frame
+ora_neg_cor$result %>%
+  mutate( group = "Negative correlation") %>%
+  rbind( mutate( ora_pos_cor$result, group = "Positive correlation")) %>%
+  rbind( mutate( ora_no_cor$result , group = "No correlation")) -> ora_all_corr
+
+# plot results
+y_colors <- RColorBrewer::brewer.pal(n = 4, name = "Dark2")
+
+prot_rna_gene_cor_df %>%
+  rename( Correlation = cor) %>% 
+  mutate( Group = case_when(   ( Correlation < 0 & p_adj < 0.05) ~ "negative",
+                               ( Correlation > 0 & p_adj < 0.05) ~ "positive",
+                               ( abs(Correlation) <= 0.05 ) ~ "low",
+                               ( abs(Correlation) > 0.05 & p_adj >= 0.05) ~ "none"
+                              )
+  ) %>% 
+  ggplot() +
+  aes(x = Correlation) +
+  geom_histogram(aes(fill = Group), show.legend = F, binwidth = 0.01, alpha = 0.7) +
+  xlab("Gene correlation") +
+  ylab("")+
+  scale_fill_manual(limits = c("low", "none", "negative", "positive"), values = c(y_colors[3],"gray",y_colors[2],y_colors[1]) ) +
+  theme_pubclean(base_size = 18, base_family = "Poppins")+
+  geom_vline( aes(xintercept = median(Correlation)), linetype = 2, col = "black", size = 1) +
+  annotate("text",
+    x = median(prot_rna_gene_cor_df$cor, na.rm = T) -0.25, y = 135,
+    label = paste0("Median = \n", formatC(median(prot_rna_gene_cor_df$cor, na.rm = T), digits = 1, format ="f")),
+    size = 6,
+    family = "Poppins"
+  )+
+  xlim(-0.5, 1)+
+  ylim(0,150)-> p1
+
+# get these:
+# negative: cellular respiration, mitochondrial ribosome
+# no correlation: Ribosome, Spliceosome OR  cytoplasmic translation, mRNA splicing, via spliceosome
+# positive correlation: extracellular region, lipid metabolic process
+# rank here is the order above
+ora_all_corr %>%
+  #filter(source %in% c("GO:BP","REAC","KEGG")) %>%
+  filter(term_name %in% c("cellular respiration", "mitochondrial ribosome",
+                          "cytoplasmic translation", "mRNA splicing, via spliceosome",
+                          "extracellular region", "lipid metabolic process","X-linked inheritance") ) %>%
+  select(term_name, intersection, p_value, group) %>%
+  arrange(desc(p_value), group) %>%
+  separate_rows(intersection) %>%
+  left_join(., prot_rna_gene_cor_df, by = c("intersection" = "mgi_symbol")) -> data
+
+ora_all_corr %>%
+  filter(term_name %in% c("cellular respiration", "mitochondrial ribosome",
+                          "cytoplasmic translation", "mRNA splicing, via spliceosome",
+                          "extracellular region", "lipid metabolic process","X-linked inheritance") ) %>%
+  select(term_name, intersection, p_value, group) %>%
+  mutate(term_name = paste(term_name, formatC(p_value, format = "e", digits = 2))) %>%
+  separate_rows(intersection) %>%
+  left_join(., prot_rna_gene_cor_df, by = c("intersection" = "mgi_symbol")) %>%
+  group_by(term_name, group, p_value) %>%
+  dplyr::summarize(med_cor = median(cor, na.rm = TRUE)) %>%
+  mutate(y_col = ifelse(group == "Negative correlation", y_colors[2],y_colors[4]),
+         y_col = ifelse(group == "No correlation", y_colors[3], y_col),
+         y_col = ifelse(group == "Positive correlation", y_colors[1], y_col)) %>%
+  arrange(group, p_value) -> med.cor
+
+data %>%
+  mutate( group2 = case_when(   ( cor < 0 & p_adj < 0.05) ~ "negative",
+                               ( cor > 0 & p_adj < 0.05) ~ "positive",
+                               ( abs(cor) <= 0.05 ) ~ "low",
+                               ( abs(cor) > 0.05 & p_adj >= 0.05) ~ "none"
+                              )
+  ) %>% 
+  arrange(cor) %>% 
+  mutate(label2 = factor(paste(term_name, formatC(p_value, format = "e", digits = 2)),
+    levels = med.cor$term_name
+  )) %>%
+  mutate(label = factor(intersection, levels = unique(intersection))) %>%
+  ggplot() +
+  aes(y = label2, x = cor, col = group2, group = term_name) +
+  geom_point(show.legend = FALSE, shape = 15) +
+  scale_color_manual(limits = c("low", "none", "negative", "positive"), values = c(y_colors[3],"gray",y_colors[2],y_colors[1]) ) +
+  xlab("Gene correlation") +
+  ylab("") +
+  theme_pubclean(base_size = 20, base_family = "Poppins") +
+  theme(
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.y = element_text(size = 13, color = (med.cor$y_col))
+  ) +
+  scale_y_discrete(position = "right") +
+  xlim(-0.5, 1)-> p2
+
+top_row <- plot_grid(p1, NULL, rel_widths = c(1, 0.7))
+bottom_row <- plot_grid(NULL, p2, rel_widths = c(0.07, 1))
+ora_cor_plot<- plot_grid(top_row, bottom_row, nrow = 2, rel_heights = c(1, 1)) 
+
+ora_cor_plot
+
+```
+
+<br>
+
+```{r Figure3C_data, warning=FALSE, message=FALSE, fig.cap ="Correlation values used in plotting Figure 3C with groups labeled."}
+
+prot_rna_gene_cor_df %>% 
+  mutate( 
+    Group = case_when(
+      (cor < 0 & p_adj < 0.05) ~ "Negative corr.",
+      (cor > 0 & p_adj < 0.05) ~ "Positive corr.",
+      ( abs(cor) < 0.05) ~ "No corr."
+    )
+    ) %>% 
+   select( 
+    `Gene name` = mgi_symbol,
+    `Protein ID` = protein_id,
+    `Gene ID` = ensembl_gene_id, 
+    `Correlation` = cor,
+    Group
+    ) %>%
+  mutate_if( is.numeric, round, 2) %>% 
+  create_dt()
+  
+
+```
+
+<br>
+
+```{r ORA_results, warning=FALSE, message=FALSE, fig.cap="List of over-represented biological processes and pathways in genes with positive, negative and no correlation between transcript and protein abundance."}
+
+
+ora_all_corr %>%
+ select(
+   `Group`=group, 
+   `Data source` = source,
+    `Term ID` = term_id,
+    `Term Name` = term_name, 
+    `Term size` = term_size, 
+    `# of intersecting proteins` = intersection_size,
+     FDR = p_value
+    ) %>% 
+  mutate_if( is.numeric, formatC, digits =2) %>% 
+  create_dt()
+
+```
+
+
+<br>
+
+#### Figure S3E 
+
+```{r FigureS3E, fig.cap = "Figure S3E: Genes that do not form complexes show significantly higher correlation between transcript and protein abundance. Boxplot comparing the pairwise Pearson correlation coefficients between transcript and protein abundance for genes that are part of protein complexes (TRUE) and that do not form complexes (FALSE).", warning=FALSE, message=FALSE, fig.height=5, fig.width=4}
+
+prot_rna_gene_cor_df %>%
+  mutate( type = ifelse( ensembl_gene_id %in% complex.gene.list$ensembl_gene_id,
+                         TRUE,
+                         FALSE)
+          ) %>%
+  ggplot() +
+  aes(y = cor, x = type) +
+  geom_boxplot( width = 0.25, aes( col = type), show.legend = F)+
+  #geom_density(aes(col = type, fill = type), show.legend = T, bins = 400, alpha = 0.6) +
+  ylab("Corelation") +
+  scale_color_manual(values = c("gray","red")) +
+  #ggtitle("Transcript vs Protein abundance for genes") +
+  theme_pubclean(base_size = 18)+
+  xlab("Complex forming")+
+  stat_compare_means(  label.x = 1.2, label.y = 1.1)+
+  ylim( -.5, 1.2) -> figure_s3e
+
+
+ggarrange(figure_s3e,          
+          labels = "E",
+          font.label = list( size = 20)
+                      )
+
+```
+
+
+
+
+
+

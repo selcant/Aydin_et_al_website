@@ -1,0 +1,1608 @@
+---
+title: "Genetic characterization of the pluripotent proteome"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: 
+      collapsed: false
+      smooth_scroll: false
+    df_print: paged
+    code_folding: hide
+---
+
+<style>
+p.caption {
+  font-size: 1em;
+}
+</style>
+
+
+```{r setup}
+
+# options
+options(stringsAsFactors = F)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_knit$set(progress = FALSE)
+
+```
+
+<br>
+<br>
+
+### Figure 4A: Genetic map of the pluripotent proteome
+
+
+```{r Figure4A, message=FALSE, warning=FALSE, fig.cap="Figure 4A: Genetic mapping identifies 1,677 significant pQTL (LOD >7.5, permutation genome-wide p < 0.05, FDR = 0.06) where 1,056 are local (within 10Mb of the protein coding gene, seen on the diagonal) and 621 are distant (off the diagonal). pQTL are plotted across the genome where the x-axis shows the location of the pQTL and the y-axis shows the midpoint of the protein coding gene.", fig.height=6, fig.width=7}
+
+
+peaks.esc_prot %>%
+  rename( protein_id = phenotype) %>%
+  left_join(all.prots2) %>%
+  mutate( same_chrom =  (peak_chr == gene_chr),
+          diff = abs(midpoint - interp_bp_peak)) %>%
+  mutate( local = ifelse( same_chrom &
+                            diff < 10e06, TRUE, FALSE
+    )) %>% 
+  # removing the pQTL for the proteins that lack annotations.
+  filter(!is.na(mgi_symbol)) -> peaks.esc_prot_annotated
+peaks.esc_prot_annotated$cumsum_bp_peak <- peaks.esc_prot_annotated$interp_bp_peak + chrom_lens_offset[peaks.esc_prot_annotated$peak_chr]
+
+chrom_segments <- tibble( start = 0, 
+                          end = chrom_lens,
+                          chr = chroms,
+                          type = as.character(rep(c(0,1),10)))
+chrom_segments$start <- chrom_segments$start+ chrom_lens_offset[chrom_segments$chr]
+chrom_segments$end <- chrom_segments$end+ chrom_lens_offset[chrom_segments$chr]
+
+ggplot()+
+  geom_rect( data = chrom_segments, aes( xmin =start, xmax = end, ymin = 0, ymax = max(end), fill = type), 
+             inherit.aes = FALSE, alpha = 0.2, show.legend = FALSE)+
+  scale_fill_manual(values = c("dark gray","white"))+
+  geom_point(data = peaks.esc_prot_annotated %>% 
+            filter( lod > 7.5), 
+            aes( x = cumsum_bp_peak, y = cumsum_bp_gene),
+            size = 2, 
+            col =qtl.colors[["prot"]],
+             inherit.aes = FALSE )+
+  theme_pubclean(base_size = 16)+
+  scale_x_discrete( name = "pQTL",
+                    limits = chrom_lens_midpt, 
+                    labels = names(chrom_lens), 
+                    expand = expansion( mult = 0.02))+
+  scale_y_discrete( name = "Protein coding gene",limits = chrom_lens_midpt, labels = names(chrom_lens), expand = expansion( mult = 0.02))+
+  theme( axis.text = element_text(size = 10),
+          panel.grid.major.x = element_blank(),
+          panel.grid.major.y = element_blank()) -> pqtl_plot
+
+pqtl_plot
+
+```
+
+
+<br>
+
+```{r Data_for_4A, fig.cap="Significant pQTL details plotted in Figure 4A.", warning=FALSE, message=FALSE}
+
+
+peaks.esc_prot_annotated %>% 
+  filter( lod > 7.5) %>% 
+  mutate( local = ifelse( local ==T, "Local", "Distant")) %>% 
+  select(
+    `Protein ID`= protein_id,
+    `Offsetted QTL peak location (bp)` = cumsum_bp_peak,
+    `Offsetted gene midpoint (bp)` = cumsum_bp_gene
+  ) %>% 
+  create_dt()
+
+```
+
+<br>
+
+#### Table S5: List of all significant pQTL in Diversity Outbred mESCs.
+
+Significant pQTL (LOD > 7.5) are listed with gene annotations including ensembl protein and gene ID, chromosomal, gene start and end location. In addition, QTL peak details like the location of the peak in centi Morgan and base pairs, as well QTL type ( within 10Mb of the midpoint is classified as local) are listed for each individual pQTL. 
+
+```{r Table_S5_generation, warning=FALSE, message=FALSE}
+
+peaks.esc_prot_annotated %>% 
+  filter( lod > 7.5) %>% 
+  mutate( local = ifelse( local ==T, "Local", "Distant")) %>% 
+  left_join( all.prots %>% 
+               select(protein_id, mgi_symbol)
+             ) %>% 
+  left_join(all.genes %>% 
+              select( mgi_symbol, ensembl_gene_id)
+            ) %>% 
+  mutate( peak_chr = as.character(peak_chr),
+          gene_chr = as.character(gene_chr)) %>%  
+  select(
+    `Protein ID`= protein_id,
+    `Gene ID` = ensembl_gene_id,
+    `MGI symbol` = mgi_symbol,
+    `QTL peak location (chr)` = peak_chr,
+    `QTL peak location (bp)` = interp_bp_peak,
+    `QTL peak location (cM)` = peak_cM,
+    `QTL LOD score` = lod,
+    `Protein coding gene location (chr)` = gene_chr,
+    `Protein coding gene start (bp)` = gene_start,
+    `Protein coding gene end (bp)` = gene_end,
+    `QTL type` = local
+  ) %>% 
+  mutate_if(is.numeric, round ,2) -> table_s5
+
+```
+
+```{r Table_S5, echo = FALSE}
+
+
+# writexl::write_xlsx( table_s5,
+#                     path = here("TableS5_Significant_pQTL.xlsx"),
+#                     col_names = TRUE,
+#                     format_headers = TRUE
+#                     )
+
+
+xfun::embed_file(here("Table_S5.xlsx"))
+
+
+```
+
+<br>
+<br>
+
+### Figure 4B: Correlation of allele effects
+
+```{r Figure_4B, fig.cap = "Figure 4B: Majority of co-mapping eQTL and pQTL show high agreement in haplotype effects. Histogram of pairwise Pearson correlation coefficients between inferred allele effects from eQTL and pQTL scans for each gene with a co-mapping QTL. The bars are colored by the significance of the pairwise correlation.", warning=FALSE, message=FALSE, fig.height=6, fig.width=5}
+
+
+shared.qtl <- peaks.shared.genes %>% 
+  filter(match %in% c("shared","shared_eQTL_pQTL") & 
+         !(lod.esc_rna < 7.5 & lod.esc_prot < 7.5)) %>% 
+  select( ensembl_gene_id, protein_id, mgi_symbol, peak_chr, interp_bp_peak.esc_rna, interp_bp_peak.esc_prot, lod.esc_prot, lod.esc_rna) %>% 
+  distinct()
+
+shared.qtl.effects <- peaks.merged.blup %>%
+  right_join(., shared.qtl) %>%
+  mutate(local = ifelse((local.esc_rna == TRUE | local.esc_prot == T), "local", "distant")) %>%
+  filter(!is.na(A.esc_rna), !is.na(A.esc_prot)) %>%
+  mutate(qtl_id = paste0("qtl_", 1:n()))
+
+shared.esc_rna.effs <- shared.qtl.effects %>%
+  select(c(paste0(LETTERS[1:8], ".esc_rna"), "qtl_id")) %>%
+  column_to_rownames("qtl_id") %>%
+  t()
+
+shared.esc_prot.effs <- shared.qtl.effects %>%
+  select(c(paste0(LETTERS[1:8], ".esc_prot"), "qtl_id")) %>%
+  column_to_rownames("qtl_id") %>%
+  t()
+
+shared.qtl.eff.corrs <- cbind(shared.esc_rna.effs, shared.esc_prot.effs)
+colnames(shared.qtl.eff.corrs) <- c(
+  paste0(colnames(shared.esc_rna.effs), "_rna"),
+  paste0(colnames(shared.esc_prot.effs), "_prot")
+)
+cor2 <- rcorr(shared.qtl.eff.corrs, type = c("pearson"))
+shared.qtl.eff.corrs.df <- data.frame(
+  cor = diag(cor2$r[
+    endsWith(rownames(cor2$r), "_prot"),
+    endsWith(colnames(cor2$r), "_rna")
+  ]),
+  row = rownames(cor2$r)[endsWith(rownames(cor2$r), "_prot")],
+  column = colnames(cor2$r)[endsWith(colnames(cor2$r), "_rna")],
+  p_val = diag(cor2$P[
+    endsWith(rownames(cor2$P), "_prot"),
+    endsWith(colnames(cor2$P), "_rna")
+  ]),
+  n = diag(cor2$n[
+    endsWith(rownames(cor2$n), "_prot"),
+    endsWith(colnames(cor2$n), "_rna")
+  ])
+) %>%
+  mutate(qtl_id = gsub("_prot", "", row)) %>%
+  mutate(p_adj = p.adjust(p_val, method = "BH")) %>%
+  arrange(desc(abs(cor))) %>%
+  left_join(., shared.qtl.effects)
+
+shared.qtl.eff.corrs.df %>%
+  mutate(`Significance` =  ifelse(p_adj < 0.1, "FDR < 0.1", "ns")) %>% 
+  ggplot() +
+  aes(y = cor, col = Significance, fill = Significance) +
+  geom_histogram(binwidth = 0.01) +
+  theme_pubclean(base_size = 18) +
+  #facet_wrap(~local, scales = "free") +
+  scale_color_manual(values = c("dark red","dark gray")) +
+  scale_fill_manual(values = c("dark red","dark gray")) +
+  ylab("Haplotype effects correlation")+
+  xlab("Count")+
+  ylim(-1,1)+
+  theme(legend.position = "right") -> allele_eff_cor_plot
+
+allele_eff_cor_plot
+
+```
+
+
+```{r Figure4B_data, fig.cap="Correlation values used in plotting in Figure 4B", warning=FALSE, message=FALSE}
+
+shared.qtl.eff.corrs.df %>%
+  mutate(`Significance` =  ifelse(p_adj < 0.1, "FDR < 0.1", "ns")) %>% 
+  select(
+    `Gene ID` = ensembl_gene_id,
+    `Protein ID` = protein_id,
+    `MGI symbol` = mgi_symbol,
+    `Correlation between allele effects` = cor,
+    Significance,
+    `pQTL LOD` = lod.esc_prot, 
+    `eQTL LOD` = lod.esc_rna, 
+    `pQTL peak location (bp)` = interp_bp_peak.esc_prot,
+    `eQTL peak location (bp)` = interp_bp_peak.esc_rna
+  ) %>% 
+  mutate_if( is.numeric, round, 2) %>% 
+  create_dt()
+
+```
+
+
+<br>
+<br>
+
+### Figure 4C: Overlapping QTL examples
+
+
+```{r Figure_4C, fig.cap = "Figure 4C: Examples of significant pQTL where the influence of genetic variation is seen at all three molecular layers are shown. On the left, LOD scores obtained from genome scans using chromatin accessibility (caQTL), transcript (eQTL) and protein abundance (pQTL) of the associated gene is plotted with the protein coding gene location annotated on the x-axis. On the right, haplotype effects obtained from the caQTL, eQTL and pQTL peaks are shown.", message=FALSE, warning=FALSE, fig.height=10, fig.width=12}
+
+# BSPRY plot
+bspry_qtl <- peaks.esc.overlap2 %>% 
+  filter( lod.esc_prot >7.5, mgi_symbol =="Bspry")
+
+# get allele effects
+peaks.esc.overlap.wEffs %>% 
+  filter( peak_id == bspry_qtl$peak_id , 
+          peak_chr == bspry_qtl$peak_chr) %>% 
+  select( mgi_symbol, 
+          paste0(LETTERS[1:8], ".esc_atac"),
+          paste0(LETTERS[1:8], ".esc_rna"),
+          paste0(LETTERS[1:8], ".esc_prot")
+  ) -> bspry_effects
+
+peaks.esc.overlap.wEffs %>% 
+  filter( peak_id == bspry_qtl$peak_id , 
+          peak_chr == bspry_qtl$peak_chr) %>% 
+  select( mgi_symbol, 
+          paste0(LETTERS[1:8], ".esc_atac"),
+          paste0(LETTERS[1:8], ".esc_rna"),
+          paste0(LETTERS[1:8], ".esc_prot")
+  ) -> bspry_effects
+
+# Allele effects plot
+bspry_effects %>% 
+  pivot_longer( cols = c( paste0(LETTERS[1:8], ".esc_atac"),
+          paste0(LETTERS[1:8], ".esc_rna"),
+          paste0(LETTERS[1:8], ".esc_prot")), 
+          names_to = c("effect"),
+          values_to = "value") %>% 
+  separate(effect, sep ="[.]", into = c("Strain","QTL")) %>% 
+  mutate( Strain = case_when( Strain == "A" ~ "A/J",
+                              Strain == "B" ~ "B6",
+                              Strain == "C" ~ "129",
+                              Strain == "D" ~ "NOD",
+                              Strain == "E" ~ "NZO",
+                              Strain == "F" ~ "CAST",
+                              Strain == "G" ~ "PWK",
+                              Strain == "H" ~ "WSB")) %>% 
+  mutate( QTL = factor(QTL, levels =c("esc_atac","esc_rna","esc_prot"))) %>% 
+  ggplot()+
+  aes( x = Strain,
+       y = value, 
+       col = QTL,
+       group = QTL)+
+  geom_point(size = 4, show.legend = FALSE)+
+  geom_line(show.legend = T, size = 1.2)+
+  theme_pubclean(base_size = 18)+
+  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
+                      labels = c("caQTL","eQTL","pQTL"))+
+  ylab("Haplotype effects")+
+  xlab("")+
+  ylim(-2,1.1)+
+  geom_hline( yintercept = 0)+
+  theme(axis.line.x = element_blank(),
+        axis.title = element_text(size = 18))+
+  labs(col ="QTL type")+
+  coord_flip( clip ="off")+
+  theme(legend.position = "none") -> bspry_haplotype_plot
+
+# get QTL scans
+bspry_caqtl <- scan1(genoprobs = probs.esc_atac,
+                 pheno = counts.normZ[,bspry_qtl$peak_id],
+                 kinship = kinship_loco.esc_atac,
+                 addcovar = covar.esc_atac)
+
+bspry_eqtl <- scan1(genoprobs = probs.esc_rna,
+                 pheno = exprZ.esc_rna[,bspry_qtl$ensembl_gene_id],
+                 kinship = kinship_loco.esc_rna,
+                 addcovar = covar.esc_rna)
+
+bspry_pqtl <- scan1(genoprobs = probs.esc_prot,
+                 pheno = exprZ.esc_prot[,bspry_qtl$protein_id],
+                 kinship = kinship_loco.esc_prot,
+                 addcovar = covar.esc_prot)
+
+bspry_caqtl %>% 
+  as.data.frame( ) %>% 
+  rename( caqtl = pheno1) %>% 
+  mutate( marker = dimnames(bspry_caqtl)[[1]]) %>% 
+  left_join(map_dat2) %>% 
+  cbind(
+    bspry_eqtl %>% as.data.frame() %>% rename( eqtl = pheno1)
+  ) %>% 
+  cbind(
+    bspry_pqtl %>% as.data.frame() %>% rename( pqtl = pheno1)
+  ) -> bspry_qtl_scans
+
+# LOD plots
+bspry_qtl_scans %>% 
+  filter( chr == bspry_qtl$peak_chr) %>% 
+  pivot_longer( cols = c("caqtl","eqtl","pqtl"), names_to = "qtl_type", values_to = "lod") %>% 
+  mutate( qtl_type = factor( qtl_type, levels = c("caqtl","eqtl","pqtl"))) %>% 
+  ggplot()+
+    aes( 
+      x= pos_bp,
+      y = lod,
+      col = qtl_type
+      )+
+    geom_line( size = 1.5)+
+    theme_pubclean( base_size = 18)+
+  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
+                      labels = c("caQTL","eQTL","pQTL"))+
+  xlab(paste0("Chr ",bspry_qtl$peak_chr," location (bp)"))+
+  ylab( "LOD score")+
+  labs(col = "QTL type")+
+  geom_segment( x = bspry_qtl$gene_start, xend = bspry_qtl$gene_end , y = 0, yend = 1, col = "black", size = 2) +
+  annotate( "text", x= bspry_qtl$midpoint, y = 2, label ="BSPRY", size =6) -> bspry_lod_plot
+
+# TFCP2L1 plot
+tfcp2l1_qtl <- peaks.esc.overlap2 %>% 
+  filter( lod.esc_prot >7.5, mgi_symbol =="Tfcp2l1", match =="shared")
+
+# Get allele effects
+peaks.esc.overlap.wEffs %>% 
+  filter( peak_id == tfcp2l1_qtl$peak_id , 
+          peak_chr == tfcp2l1_qtl$peak_chr) %>% 
+  select( mgi_symbol, 
+          paste0(LETTERS[1:8], ".esc_atac"),
+          paste0(LETTERS[1:8], ".esc_rna"),
+          paste0(LETTERS[1:8], ".esc_prot")
+  ) -> tfcp2l1_effects
+
+# Allele effects plot
+tfcp2l1_effects %>% 
+    pivot_longer( cols = c( paste0(LETTERS[1:8], ".esc_atac"),
+          paste0(LETTERS[1:8], ".esc_rna"),
+          paste0(LETTERS[1:8], ".esc_prot")), 
+          names_to = c("effect"),
+          values_to = "value") %>% 
+  separate(effect, sep ="[.]", into = c("Strain","QTL")) %>% 
+  mutate( Strain = case_when( Strain == "A" ~ "A/J",
+                              Strain == "B" ~ "B6",
+                              Strain == "C" ~ "129",
+                              Strain == "D" ~ "NOD",
+                              Strain == "E" ~ "NZO",
+                              Strain == "F" ~ "CAST",
+                              Strain == "G" ~ "PWK",
+                              Strain == "H" ~ "WSB")) %>% 
+  mutate( QTL = factor(QTL, levels =c("esc_atac","esc_rna","esc_prot"))) %>% 
+  ggplot()+
+  aes( x = Strain,
+       y = value, 
+       col = QTL,
+       group = QTL)+
+  geom_point(size = 4, show.legend = FALSE)+
+  geom_line(show.legend = T, size = 1.2)+
+  theme_pubclean(base_size = 18)+
+  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
+                      labels = c("caQTL","eQTL","pQTL"))+
+  ylab("Haplotype effects")+
+  xlab("")+
+  ylim(-2,1.1)+
+  geom_hline( yintercept = 0)+
+  theme(axis.line.x = element_blank(),
+        axis.title = element_text(size = 18))+
+  labs(col ="QTL type")+
+  coord_flip( clip ="off")+
+  theme(legend.position = "none")  -> tfcp2l1_haplotype_plot
+
+# Get QTL scans
+tfcp2l1_caqtl <- scan1(genoprobs = probs.esc_atac,
+                     pheno = counts.normZ[,tfcp2l1_qtl$peak_id],
+                     kinship = kinship_loco.esc_atac,
+                     addcovar = covar.esc_atac)
+
+tfcp2l1_eqtl <- scan1(genoprobs = probs.esc_rna,
+                    pheno = exprZ.esc_rna[,tfcp2l1_qtl$ensembl_gene_id],
+                    kinship = kinship_loco.esc_rna,
+                    addcovar = covar.esc_rna)
+
+tfcp2l1_pqtl <- scan1(genoprobs = probs.esc_prot,
+                    pheno = exprZ.esc_prot[,tfcp2l1_qtl$protein_id],
+                    kinship = kinship_loco.esc_prot,
+                    addcovar = covar.esc_prot)
+tfcp2l1_caqtl %>% 
+  as.data.frame( ) %>% 
+  rename( caqtl = pheno1) %>% 
+  mutate( marker = dimnames(tfcp2l1_caqtl)[[1]]) %>% 
+  left_join(map_dat2) %>% 
+  cbind(
+    tfcp2l1_eqtl %>% as.data.frame() %>% rename( eqtl = pheno1)
+  ) %>% 
+  cbind(
+    tfcp2l1_pqtl %>% as.data.frame() %>% rename( pqtl = pheno1)
+  ) -> tfcp2l1_qtl_scans
+
+# LOD plots
+tfcp2l1_qtl_scans %>% 
+  filter( chr == tfcp2l1_qtl$peak_chr) %>% 
+  pivot_longer( cols = c("caqtl","eqtl","pqtl"), names_to = "qtl_type", values_to = "lod") %>% 
+  mutate( qtl_type = factor( qtl_type, levels = c("caqtl","eqtl","pqtl"))) %>% 
+  ggplot()+
+    aes( 
+      x= pos_bp,
+      y = lod,
+      col = qtl_type
+      )+
+    geom_line( size = 1.5)+
+    theme_pubclean( base_size = 18)+
+  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
+                      labels = c("caQTL","eQTL","pQTL"))+
+  xlab(paste0("Chr ",tfcp2l1_qtl$peak_chr," location (bp)"))+
+  ylab( "LOD score")+
+  labs(col = "QTL type")+
+  geom_segment( x = tfcp2l1_qtl$gene_start, xend = tfcp2l1_qtl$gene_end , y = 0, yend = 1, col = "black", size = 2) +
+  annotate( "text", x= tfcp2l1_qtl$midpoint, y = 2, label ="TFCP2L1", size =6) +
+  ylim(0,15)-> tfcp2l1_lod_plot
+
+bspry_plot <- ggarrange( bspry_lod_plot, bspry_haplotype_plot,
+                         common.legend = TRUE, 
+                         widths = c(0.7, 0.4))
+
+tfcp2l1_plot <- ggarrange( tfcp2l1_lod_plot, tfcp2l1_haplotype_plot, 
+                           common.legend = TRUE, 
+                           widths = c(0.7, 0.4) )
+
+figure_4C <- ggarrange( bspry_plot, tfcp2l1_plot, nrow = 2)
+
+
+figure_4C
+
+```
+
+<br>
+
+```{r Figure4C_data, fig.cap="QTL scans used to generate Figure 4C."}
+
+bspry_qtl_scans %>% 
+  filter( chr == 4) %>% 
+  mutate( Protein = "BSPRY") %>% 
+  rbind(
+    tfcp2l1_qtl_scans %>% 
+      filter( chr == 1) %>% 
+      mutate( Protein = "TFCP2L1") 
+    ) %>% 
+  select(
+    Protein, 
+    marker, 
+    chr, 
+    pos_cM,
+    pos_bp,
+    caqtl,
+    eqtl,
+    pqtl
+  ) %>% 
+  mutate_if( is.numeric, round ,2) %>% 
+  create_dt()
+
+
+
+```
+
+<br>
+
+```{r Figure4C_data2, fig.cap="Haplotype effects used to generate Figure 4C."}
+
+
+bspry_effects %>% 
+  mutate( Protein = "BSPRY") %>% 
+  rbind(
+    tfcp2l1_effects %>% 
+      mutate( Protein ="TFCP2L1")
+  ) %>% 
+  select( -mgi_symbol) %>% 
+  pivot_longer( cols = c( paste0(LETTERS[1:8], ".esc_atac"),
+          paste0(LETTERS[1:8], ".esc_rna"),
+          paste0(LETTERS[1:8], ".esc_prot")), 
+          names_to = c("effect"),
+          values_to = "value") %>% 
+  separate(effect, sep ="[.]", into = c("Strain","QTL")) %>% 
+  mutate( Strain = case_when( Strain == "A" ~ "A/J",
+                              Strain == "B" ~ "B6",
+                              Strain == "C" ~ "129",
+                              Strain == "D" ~ "NOD",
+                              Strain == "E" ~ "NZO",
+                              Strain == "F" ~ "CAST",
+                              Strain == "G" ~ "PWK",
+                              Strain == "H" ~ "WSB")) %>% 
+  mutate( QTL = case_when(
+    QTL == "esc_atac"~"caQTL",
+    QTL == "esc_rna"~"eQTL",
+    QTL == "esc_prot"~"pQTL" )
+  ) %>%
+  mutate_if(is.numeric , round, 2) %>% 
+  create_dt()
+
+```
+
+
+<br>
+<br>
+
+### Figure 4D: pQTL hotspots
+
+
+```{r Figure_4D, warning=FALSE, message=FALSE, fig.cap = "Figure 4D: Histogram depicting the number of total distant pQTL forming hotspots across the genome.", fig.width=7, fig.height=3}
+
+# Get pQTL hotspots
+# prep the objects
+map_dat2$chromF <- factor(map_dat2$chrom, levels = c(as.character(1:19), "X"))
+chrom_markers <- select(map_dat2, chromF, n) %>%
+  rename(chrom = chromF) %>%
+  group_by(chrom) %>%
+  summarize(start = min(n), end = max(n)) %>%
+  GenomicRanges::GRanges()
+windows <- unlist(GenomicRanges::slidingWindows(chrom_markers, width = 50, step = 10))
+markers_bynum <- select(map_dat2, chrom, n) %>%
+  dplyr::rename(start = n) %>%
+  mutate(end = start) %>%
+  GenomicRanges::GRanges()
+
+distant_esc_prot <- filter(peaks.esc_prot_annotated, lod > 7.5, !is.na(local) & !(local)) %>%
+  select(peak_chr, interp_bp_peak) %>%
+  dplyr::rename(chrom = peak_chr, end = interp_bp_peak) %>%
+  mutate(start = end) %>%
+  GenomicRanges::GRanges()
+
+distant_esc_prot_sugg <- filter(peaks.esc_prot_annotated, lod > 6, !is.na(local) & !(local)) %>%
+  select(peak_chr, interp_bp_peak) %>%
+  dplyr::rename(chrom = peak_chr, end = interp_bp_peak) %>%
+  mutate(start = end) %>%
+  GenomicRanges::GRanges()
+
+markers <- select(map_dat2, chrom, pos_bp) %>%
+  dplyr::rename(start = pos_bp) %>%
+  mutate(end = start) %>%
+  GenomicRanges::GRanges() # length 69,005
+
+x <- GenomicRanges::nearest(distant_esc_prot_sugg, markers)
+y <- GenomicRanges::nearest(distant_esc_prot, markers)
+
+windows$distant_esc_prot_sugg <- GenomicRanges::countOverlaps(windows, markers_bynum[x])
+windows$distant_esc_prot <- GenomicRanges::countOverlaps(windows, markers_bynum[y])
+window_counts <- tibble(
+  chrom = as.character(GenomicRanges::seqnames(windows)),
+  start = GenomicRanges::start(windows), end = GenomicRanges::end(windows),
+  distant_esc_prot = windows$distant_esc_prot,
+  distant_esc_prot_sugg = windows$distant_esc_prot_sugg,
+)
+mm <- match(window_counts$start, map_dat2$n)
+m2 <- match(window_counts$end, map_dat2$n)
+window_counts$pos_cM_start <- map_dat2$pos_cM[mm]
+window_counts$pos_bp_start <- map_dat2$pos_bp[mm]
+window_counts$pos_cM_end <- map_dat2$pos_cM[m2]
+window_counts$pos_bp_end <- map_dat2$pos_bp[m2]
+window_counts <- window_counts %>%
+  mutate(midpoint = (pos_cM_end + pos_cM_start) / 2, 4)
+
+x <- select(window_counts, chrom, starts_with("pos_bp"), starts_with("distant")) %>%
+  filter( distant_esc_prot > quantile(distant_esc_prot,0.995) ,
+          distant_esc_prot_sugg > quantile(distant_esc_prot_sugg,0.995) ,)
+
+bands.esc.prot <- x %>%
+  rename(start = pos_bp_start, end = pos_bp_end) %>%
+  GenomicRanges::GRanges() %>%
+  GenomicRanges::reduce()
+# reduce collapses overlapping windows into one big window. 
+bands.esc.prot$distant_esc_prot <- GenomicRanges::countOverlaps(bands.esc.prot, distant_esc_prot)
+bands.esc.prot$distant_esc_prot_sugg <- GenomicRanges::countOverlaps(bands.esc.prot, distant_esc_prot_sugg)
+
+# Plot hotspots
+bands.esc.prot %>% 
+  as_tibble() %>% 
+  select( chrom = seqnames, start, end, distant_esc_prot) %>% 
+  mutate( hotspot_midpoint = (start+end)/2 ) %>% 
+  # adding all the marker locations to match axes
+  rbind( (map_dat2 %>% 
+              select( chrom, start = pos_bp, end =pos_bp) %>% 
+              mutate( distant_esc_prot = 0,
+                      hotspot_midpoint = start))) %>% 
+  mutate( chrom = factor(chrom, levels = c(seq(1:19),"X")) ) -> pqtl_counts
+
+# adding all the markers with 0 hotspot values to match the axes
+pqtl_counts$midpoint_offset <- pqtl_counts$hotspot_midpoint + chrom_lens_offset[pqtl_counts$chrom]
+
+pqtl_counts %>% 
+  rename(
+    `Offsetted hotspot midpoint (bp)` = midpoint_offset,
+    `# of distant pQTL` = distant_esc_prot
+  ) %>% 
+  ggplot()+
+  aes( x = `Offsetted hotspot midpoint (bp)`, 
+       y = `# of distant pQTL`)+
+  geom_bar( stat = "identity", width = 100, col =qtl.colors[["prot"]], fill= qtl.colors[["prot"]] )+
+  theme_pubclean(base_size = 16)+
+  scale_x_continuous( name = "Chr",
+                      breaks = chrom_lens_midpt, 
+                      labels = names(chrom_lens), expand = expansion(mult = .02) )+
+  xlab("")+
+  ylab("# of distant pQTL")+
+  theme( axis.text = element_text(size = 10)) -> trans_band_plot
+
+trans_band_plot
+
+```
+
+<br>
+
+```{r Figure_4D_data, fig.cap="Data used in plotting Figure 4D.", warning=FALSE, message=FALSE}
+
+pqtl_counts %>% 
+  select(
+    Chr = chrom, 
+    `Offsetted hotspot midpoint (bp)` = midpoint_offset,
+    `# of distant pQTL` = distant_esc_prot
+  ) %>% 
+  arrange( as.numeric(Chr)) %>% 
+  create_dt()
+
+
+```
+
+<br>
+
+#### Table S6: List of pQTL hotspots and their target proteins.
+
+The details of each pQTL hotspot such as chromosomal location, start, end, width and the number of significant (LOD > 7.5) and suggestive (LOD > 6) pQTL found are listed. For each, the suggestive distant pQTL found within the hotspot is listed with gene annotations and QTL details as well. 
+
+```{r Table_S6_generate, warning=FALSE, message=FALSE}
+
+# QTL Chromosome	QTL Start (bp)	QTL End (bp)	QTL Width (bp)	Number of Significant Distant pQTL (LOD > 7.5)	Number of Suggestive Distant pQTL (LOD > 6)
+bands.esc.prot %>% 
+  as_tibble() %>% 
+  filter(distant_esc_prot > 20) %>% 
+  select(
+    `QTL Hotspot Chromosome` = seqnames,
+    `QTL Hotspot Start (bp)` = start,
+    `QTL Hotspot End (bp)` = end, 
+    `QTL Hotspot Width (bp)` = width,
+    `Number of Signfiicant Distant pQTl (LOD > 7.5)` = distant_esc_prot,
+    `Number of Suggestive Distant pQTl (LOD > 6)` = distant_esc_prot_sugg
+  ) -> tables6_sheet1
+
+
+bands.esc.prot %>% 
+  as_tibble() %>% 
+  filter(distant_esc_prot > 20) -> bands_esc_prot_signif
+
+peaks.esc_prot_annotated %>% 
+  filter( peak_chr == 4) %>% 
+  filter(
+    local == FALSE & 
+      interp_bp_peak >= bands_esc_prot_signif$start[1] &
+      interp_bp_peak <= bands_esc_prot_signif$end[1]  &
+      lod > 6
+  ) %>% 
+  select(
+    `Protein ID` = protein_id, 
+    `Gene ID` = ensembl_gene_id,
+    `MGI Symbol` = mgi_symbol,
+    `Gene Chr` = gene_chr,
+    `Gene Start (bp)` = gene_start,
+    `Gene End (bp)` = gene_end, 
+    `QTL Chr` = peak_chr,
+    `QTL Position (cM)` = peak_cM,
+    `QTL Position (bp)` = interp_bp_peak, 
+    `LOD Score` = lod
+  ) %>% 
+    mutate_if( is.numeric, round ,2)-> tables6_sheet2
+
+peaks.esc_prot_annotated %>% 
+  filter( peak_chr == 9) %>% 
+  filter(
+    local == FALSE & 
+      interp_bp_peak >= bands_esc_prot_signif$start[2] &
+      interp_bp_peak <= bands_esc_prot_signif$end[2]  &
+      lod > 6
+  ) %>% 
+  select(
+    `Protein ID` = protein_id, 
+    `Gene ID` = ensembl_gene_id,
+    `MGI Symbol` = mgi_symbol,
+    `Gene Chr` = gene_chr,
+    `Gene Start (bp)` = gene_start,
+    `Gene End (bp)` = gene_end, 
+    `QTL Chr` = peak_chr,
+    `QTL Position (cM)` = peak_cM,
+    `QTL Position (bp)` = interp_bp_peak, 
+    `LOD Score` = lod
+  ) %>% 
+    mutate_if( is.numeric, round ,2) -> tables6_sheet3
+
+
+peaks.esc_prot_annotated %>% 
+  filter( peak_chr == 15) %>% 
+  filter(
+    local == FALSE & 
+      interp_bp_peak >= bands_esc_prot_signif$start[3] &
+      interp_bp_peak <= bands_esc_prot_signif$end[3]  &
+      lod > 6
+  ) %>% 
+  select(
+    `Protein ID` = protein_id, 
+    `Gene ID` = ensembl_gene_id,
+    `MGI Symbol` = mgi_symbol,
+    `Gene Chr` = gene_chr,
+    `Gene Start (bp)` = gene_start,
+    `Gene End (bp)` = gene_end, 
+    `QTL Chr` = peak_chr,
+    `QTL Position (cM)` = peak_cM,
+    `QTL Position (bp)` = interp_bp_peak, 
+    `LOD Score` = lod
+  ) %>% 
+    mutate_if( is.numeric, round ,2) -> tables6_sheet4
+
+```
+
+<br>
+
+
+```{r Table_S6_display, echo = FALSE}
+
+
+
+# writexl::write_xlsx( list( pQTL_hotspots = tables6_sheet1,
+#                            Chr4_hotspot = tables6_sheet2,
+#                            Chr9_hotspot = tables6_sheet3,
+#                            Chr15_hotspot = tables6_sheet4),
+#                     path = here("TableS6_pQTL_hotspots.xlsx"),
+#                     col_names = TRUE,
+#                     format_headers = TRUE
+#                     )
+# 
+
+xfun::embed_file(here("Table_S6.xlsx"))
+
+
+
+```
+
+<br>
+
+#### Figure S4A-B
+
+```{r Figure_S4A, fig.cap="Figure S4A: The allelic split observed in previously described eQTL hotspot on chromosome 15 is also observed for the pQTL hotspot. Heatmap showing haplotype effects at suggestive distant pQTL peaks (LOD > 6) within the chromosome 15 hotspot.", warning=FALSE, message=FALSE, fig.height=5, fig.width=8}
+
+
+chr15.pQTL <- peaks.esc_prot.wEffs %>%
+  filter(peak_chr == 15) %>%
+  filter(lod.esc_prot > 6 & !local.esc_prot & !is.na(protein_id) &
+    interp_bp_peak.esc_prot > filter(bands_esc_prot_signif)$start[3] &
+    interp_bp_peak.esc_prot < filter(bands_esc_prot_signif)$end[3])
+
+chr15.all.genes.weff.mat <- chr15.pQTL %>%
+  filter(!is.na(A.esc_prot)) %>%
+  select(c(paste0(LETTERS[1:8], ".esc_prot"), "mgi_symbol")) %>%
+  distinct() %>%
+  column_to_rownames("mgi_symbol") %>%
+  as.matrix() %>%
+  t()
+
+annotation_row <- data.frame(strain = c("AJ", "B6", "129", "NOD", "NZO", "CAST", "PWK", "WSB"))
+rownames(annotation_row) <- rownames(chr15.all.genes.weff.mat)
+
+annot.colors <- list(
+  strain = c(
+   c(AJ = "#F0E442", B6 = "#555555", `129` = "#E69F00", NOD = "#0072B2",
+   NZO = "#56B4E9", CAST = "#009E73", PWK = "#D55E00", WSB = "#CC79A7")
+  ),
+  match = c(ESC_pQTL = qtl.colors[["prot"]], shared = qtl.colors[["shared"]])
+)
+
+
+(pheatmap(chr15.all.genes.weff.mat,
+  cluster_rows = T, show_rownames = FALSE,
+  cluster_cols = T, show_colnames = FALSE,
+  clustering_method = "complete",
+  scale = "none",
+  clustering_distance_cols = "correlation",
+  clustering_distance_rows = "correlation",
+  main = "Founder allele effects of suggestive pQTL within chr 15 hotspot",
+  #annotation_col = annotation,
+  annotation_row = annotation_row,
+  annotation_colors = annot.colors, cutree_rows = 2,
+  cellwidth = 3
+)) 
+
+
+```
+
+<br>
+
+```{r FigureS4B,  warning=FALSE, message=FALSE, fig.width=10, fig.height=5, fig.cap="Figure S4B: Mediation analysis identifies Lifr transcript abundance as the best mediator for chromosome 15 pQTL hotspot. Decrease in LOD scores due to mediation is plotted for the top five mediators in the region for the suggestive distant pQTL. The points are colored and sized according to LOD difference. For 61/131 suggestive distant pQTL peaks in the region, Lifr transcript abundance leads to the largest drop in LOD when included as a covariate in the genetic mapping model."}
+
+
+pqtl_rna_meds %>%
+  inner_join(select(chr15.pQTL, "target.id" = protein_id, "qtl.chr" = peak_chr)) -> chr15.rna.meds
+
+pqtl_prot_meds %>% 
+  inner_join(select(chr15.pQTL, "target.id" = protein_id, "qtl.chr" = peak_chr)) -> chr15.prot.meds
+
+chr15.rna.meds %>%
+  mutate( type = "rna") %>% 
+  rbind( chr15.prot.meds %>%  mutate( type = "protein")) %>% 
+  mutate(mediation.lod = ifelse(target.symbol == mediator.symbol, NA, mediation.lod)) %>%
+  mutate(lod_drop = target.lod - mediation.lod) %>%
+  group_by(target.symbol, type) %>%
+  arrange(mediation.lod) %>%
+  mutate(rank = rep(seq(1:n()))) -> chr15.meds.ranked
+
+chr15.meds.ranked.sum <- chr15.meds.ranked %>%
+  filter(rank == 1) %>% #filter(mediator.symbol =="Lifr") %>%  select(lod_drop)
+  group_by(mediator.symbol, type) %>%
+  summarize(n = length(target.symbol), min_drop = min(lod_drop, na.rm = T), max_drop = max(lod_drop, na.rm = T), med_drop = median(lod_drop, na.rm = T)) %>%
+  arrange(desc(n))
+
+# looking at the top!
+results <- chr15.meds.ranked %>%
+  ungroup() %>%
+  select(mediator.symbol, target.symbol, mediation.lod, target.lod) %>%
+  mutate(mediator.symbol = str_c(mediator.symbol, "_rna")) %>%
+  mutate(lod_drop = target.lod - mediation.lod) %>%
+  select(-mediation.lod, -target.lod) %>%
+  filter((mediator.symbol %in% str_c(chr15.meds.ranked.sum$mediator.symbol[1:5], "_rna"))) %>%
+  mutate(lod_drop = ifelse(lod_drop < 0, 0, lod_drop), lod_drop = ifelse(lod_drop > 6, 6, lod_drop)) %>%
+  rename(target = target.symbol, LOD_diff = lod_drop)
+
+ggplot(results, aes(y = mediator.symbol, x = target)) +
+  geom_point(aes(color = LOD_diff, size = exp(LOD_diff) / 30), alpha = 0.6) +
+  scale_color_gradientn(
+    colors = c("white", "firebrick3", "navy"),
+    values = scales::rescale(c(0, 3, 6)),
+    name = "LOD\ndifference", limits = c(0, 6)
+  ) +
+  scale_size(breaks = 0:6, labels = as.character(0:6), range = c(0, 8)) +
+  guides(size = "none") +
+  theme_pubclean(base_size = 18) +
+  theme(
+    axis.text.y = element_text(size = 14, hjust = 1),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(size = 0),
+    axis.title = element_text(size = 14),
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 16),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank()
+  ) +
+  xlab("Target pQTL")+
+  ylab("Mediator") -> Figure_S4B
+
+Figure_S4B
+
+```
+
+<br>
+
+#### Figure S4C
+
+
+```{r Figure_S4C, fig.height=4, fig.width=9,  warning=FALSE, message=FALSE, fig.cap="Figure S4C: Genetic mapping with GSVA scores of GO term Protein ADP-Ribosylation identifies a near significant QTL on chromosome 15 with similar haplotype effects to the chromosome 15 molecular QTL hotspot. On the left, genome scan showing LOD scores is plotted for chromosome 15. On the right, inferred haplotype effects at the QTL peak is plotted."}
+
+
+# QTL mapping with GSVA scores
+# Commented out and the results are saved to an RData file because it takes a long time to run.
+gsva_results %>%
+  filter( Category %in% (signif_results_tukey %>% filter( term %in% c("sex","lifr_geno"),
+                                                          p.adj.signif != "ns" ))$Category ) %>%
+  select(Category, sampleid, Enrichment_Score) %>%
+  pivot_wider( id_cols = sampleid , names_from = Category, values_from = Enrichment_Score) %>%
+  column_to_rownames("sampleid") %>%
+  as.matrix() -> gsva_results_signif_mat
+
+# rankZ
+gsva_results_signif_mat_rankZ <- apply(gsva_results_signif_mat, 2,rankZ )
+# 
+# # qtl mapping
+# gsva_qtl <- scan1( genoprobs = probs.esc_prot, 
+#                    pheno = gsva_results_signif_mat_rankZ, 
+#                    kinship = kinship_loco.esc_prot,
+#                    addcovar = covar.esc_prot)
+# save( gsva_qtl, file = here("_data","GSVA_qtl_scans.RData"))
+
+load(here("../pQTL_website/_data/GSVA_qtl_scans.RData"))
+gsva_qtl_peaks <- find_peaks( gsva_qtl, threshold = 7, gmap)
+# add interp_peak_bp, before, after
+gsva_qtl_peaks <- gsva_qtl_peaks %>% 
+  left_join( ., goannot_wdef %>% select(lodcolumn=GOID,TERM) %>% distinct()) %>% 
+  mutate( TERM = ifelse( is.na(TERM), lodcolumn, TERM)) %>% 
+  mutate(phenotype=lodcolumn) %>%
+  mutate( peak_chr = chr,
+          peak_cM = pos) %>%
+  interp_bp(.) #add bp location for peaks
+
+# Get the bounding markers for each QTL peak
+# i.e. markers on the 69k grid that are up- and downstream of the peak
+query <- gsva_qtl_peaks %>% dplyr::select(peak_chr, interp_bp_peak) %>%
+    dplyr::rename(chrom=peak_chr, start=interp_bp_peak) %>% mutate(end=start) %>%
+    GenomicRanges::GRanges()
+subject <- select(map_dat2, chrom, pos_bp) %>% dplyr::rename(start=pos_bp) %>%
+    mutate(end=start) %>% GenomicRanges::GRanges()   # length 69,005
+
+gsva_qtl_peaks$before <- map_dat2$marker[follow(query, subject)]
+gsva_qtl_peaks$after <- map_dat2$marker[precede(query, subject)]
+
+# plot Protein ADP ribosylation
+ribo_scan_plot <- gsva_qtl[,"GO:0006471",drop=FALSE] %>% 
+  as.data.frame() %>% 
+  rownames_to_column("marker") %>% 
+  left_join(map_dat2) %>% 
+  filter( chr == 15) %>% 
+  ggplot()+
+    aes( 
+      x= pos_bp,
+      y = `GO:0006471`,
+      )+
+  geom_line( size = 1.5, col = qtl.colors[["prot"]])+
+  theme_pubclean( base_size = 18)+
+  xlab(paste0("Chr 15 location (bp)"))+
+  ylab( "LOD score")+
+  ylim(0,8)
+
+ribo_effs <- scan1blup( genoprobs = probs.esc_prot[,15], 
+                   pheno = gsva_results_signif_mat_rankZ[,"GO:0006471",drop=FALSE], 
+                   kinship = kinship_loco.esc_prot[[15]],
+                   addcovar = covar.esc_prot)  
+ribo_qtl<- gsva_qtl_peaks %>% 
+  filter( phenotype =="GO:0006471", peak_chr == 15)
+ribo_effs <- colMeans(ribo_effs[c(ribo_qtl$before,ribo_qtl$after), LETTERS[1:8]])
+
+ribo_effs %>% 
+  as_tibble(rownames = "effect" ) %>% 
+  mutate( type = "pQTL") %>% 
+  mutate( effect = case_when( effect == "A" ~ "AJ",
+                              effect == "B" ~ "B6",
+                              effect == "C" ~ "129",
+                              effect == "D" ~ "NOD",
+                              effect == "E" ~ "NZO",
+                              effect == "F" ~ "CAST",
+                              effect == "G" ~ "PWK",
+                              effect == "H" ~ "WSB")) %>% 
+  ggplot()+
+  aes( x = effect,
+       y = value, 
+       group = type)+
+  geom_point(size = 4, show.legend = FALSE, col = qtl.colors[["prot"]])+
+  geom_line(size = 1.2, show.legend = F, col = qtl.colors[["prot"]])+
+  theme_pubclean(base_size = 18)+
+  ylab("Haplotype effects")+
+  xlab("")+
+  ylim(-1,1)+
+  geom_hline( yintercept = 0)+
+  theme(axis.line.x = element_blank(),
+        axis.title = element_text(size = 18))+
+  coord_flip( clip ="off")+
+  theme(legend.position = "none") -> ribo_hap_plot
+
+ribo_qtl_plot <- ggarrange(ribo_scan_plot, ribo_hap_plot, nrow = 1, widths = c(0.7, 0.4))
+ribo_qtl_plot
+
+
+```
+
+<br>
+<br>
+
+### Figure 4E: Stoichometric buffering example
+
+```{r Figure4E, fig.cap = "Figure 4E: An example of physical interaction propagating the effects of genetic variation is plotted. On the left, genome scan showing LOD scores across the genome for proteins RPA1, RPA2 and RPA3 is shown with the location of Rpa3 gene annotated on the x- axis. On the right, the inferred founder allele effects at the pQTL peak for all three genes are shown.", warning=FALSE, message=FALSE, fig.height=4, fig.width=9}
+
+rpa_qtl <- peaks.esc.overlap2 %>% 
+  filter( lod.esc_prot >7.5, mgi_symbol %in% c("Rpa1","Rpa2","Rpa3"), match%in% c("esc_prot","shared"))
+
+# Effects plot
+# "A/J", "B6", "129", "NOD", "NZO", "CAST", "PWK", "WSB"
+peaks.esc.overlap.wEffs %>% 
+  filter( protein_id %in% rpa_qtl$protein_id , 
+          peak_chr %in% rpa_qtl$peak_chr, 
+          match%in% c("esc_prot","shared")) %>% 
+  select( mgi_symbol, 
+          paste0(LETTERS[1:8], ".esc_prot")
+  ) -> rpa_effects
+
+rpa_effects %>% 
+  column_to_rownames("mgi_symbol") %>%  t() -> rpa_effects_mat
+
+rpa_effects %>% 
+  mutate( Protein= toupper(mgi_symbol)) %>% 
+  pivot_longer( cols = c(paste0(LETTERS[1:8], ".esc_prot")), 
+                names_to = c("effect"),
+                values_to = "pQTL effect") %>% 
+  separate(effect, sep ="[.]", into = c("Strain","type")) %>% 
+  mutate( Strain = case_when( Strain == "A" ~ "A/J",
+                              Strain == "B" ~ "B6",
+                              Strain == "C" ~ "129",
+                              Strain == "D" ~ "NOD",
+                              Strain == "E" ~ "NZO",
+                              Strain == "F" ~ "CAST",
+                              Strain == "G" ~ "PWK",
+                              Strain == "H" ~ "WSB")) -> rpa_effects_plot_data
+
+rpa_effects_plot_data %>% 
+  ggplot()+
+  aes( x = Strain,
+       y = `pQTL effect`, 
+       group= Protein, 
+       col = Protein)+
+  geom_point(size = 4, show.legend = F)+
+  geom_line(show.legend = T, size =1.2)+
+  scale_color_manual( values = c( RColorBrewer::brewer.pal(6, "Blues")[3],
+                                  RColorBrewer::brewer.pal(6, "Blues")[6],
+                                  RColorBrewer::brewer.pal(6, "Blues")[4]))+
+  theme_pubclean(base_size = 18)+
+  ylab("Haplotype effects")+
+  xlab("")+
+  ylim(-1.6,1.6)+
+  geom_hline( yintercept = 0)+
+  theme(axis.line.x = element_blank(),
+        axis.title = element_text(size = 18))+
+  labs(shape = "Protein")+
+   coord_flip( clip ="off")+
+  theme(legend.position = "none") -> rpa_haplotype_plot
+
+
+# LOD plots
+rpa_pqtl <- scan1(genoprobs = probs.esc_prot,
+                      pheno = exprZ.esc_prot[,rpa_qtl$protein_id],
+                      kinship = kinship_loco.esc_prot,
+                      addcovar = covar.esc_prot)
+
+
+rpa_pqtl %>% 
+  as_tibble(rownames = "marker") %>% 
+  left_join(map_dat2)  %>% 
+  filter( chr == rpa_qtl$peak_chr[1]) %>% 
+  pivot_longer( cols = c("ENSMUSP00000012627","ENSMUSP00000099621","ENSMUSP00000000767"), names_to = "protein_id", values_to = "lod") %>% 
+  left_join( select(all.prots, protein_id, mgi_symbol)) %>% 
+  mutate( Protein= toupper(mgi_symbol)) %>% 
+  mutate( Protein = factor( Protein, levels = c("RPA1","RPA2","RPA3"))) %>% 
+  rename( `LOD score` = lod, `Marker Position (bp)` = pos_bp) -> rpa_pqtl_scans
+
+rpa_pqtl_scans %>% 
+  ggplot()+
+    aes( 
+      x= `Marker Position (bp)`,
+      y =  `LOD score`,
+      col = Protein,
+      )+
+    geom_line( size = 1.5)+
+    theme_pubclean( base_size = 18)+
+  scale_color_manual( values = c( RColorBrewer::brewer.pal(6, "Blues")[3],
+                                  RColorBrewer::brewer.pal(6, "Blues")[6],
+                                  RColorBrewer::brewer.pal(6, "Blues")[4]))+
+  xlab(paste0("Chr ",rpa_qtl$peak_chr[1]," location (bp)"))+
+  ylab( "LOD score")+
+  labs(col = "Protein")+
+  geom_segment( x = rpa_qtl$gene_start[1], xend = rpa_qtl$gene_end[1] , y = 0, yend = 1, col = "black", size = 2) +
+  annotate( "text", x= rpa_qtl$midpoint[1], y = 2, label ="italic(Rpa3)", parse = TRUE, size =6) +
+  ylim(0,20) -> rpa_lod_plot
+
+
+Figure_4E <- ggarrange( rpa_lod_plot, rpa_haplotype_plot, common.legend = TRUE, widths = c(0.7, 0.4) )
+
+Figure_4E
+
+
+```
+
+<br>
+
+```{r Figure4E_data_qtl_scans, fig.cap="QTL scans used in plotting LOD plots in Figure 4E."}
+
+
+rpa_pqtl_scans %>% 
+  select( Protein, 
+          `LOD score` , 
+          `Marker Position (bp)`) %>% 
+  mutate(`LOD score` = formatC(`LOD score`, digits =2)) %>% 
+  create_dt()
+
+
+```
+
+<br>
+
+```{r Figure4E_data_effects, fig.cap="Haplotype effects plotted in Figure 4E."}
+
+rpa_effects_plot_data %>% 
+  select( Protein,
+          Strain,
+          `pQTL effect`) %>% 
+  mutate_if( is.numeric, round ,2) %>% 
+  create_dt()
+  
+
+```
+
+<br>
+<br>
+
+### Figure 4F: Overview of significant pQTL overlap with caQTL and eQTL
+
+
+```{r Figure_4F, fig.cap = "Figure 4F: Graphical overview of the different groups of pQTL where the genetic variation (QTL) influences one or more molecular layers. Molecular layers lacking any impact (i.e., no QTL above LOD >5 with matching haplotype effects) are depicted in gray.", out.width="600px"}
+
+
+knitr::include_graphics(here("Figure4F.png"))
+
+```
+
+<br>
+
+```{r Figure_4F_data, warning=FALSE, message=FALSE, fig.cap="Data used to generate Figure 4F."}
+
+ids <- threeway.shared.samples$sampleid
+names(ids) <- threeway.shared.samples$top_muga
+threeway.shared.probs <- merged.probs[ind = threeway.shared.samples$top_muga]
+threeway.shared.probs <- replace_ids(threeway.shared.probs, ids)
+shared.kinship <- calc_kinship(threeway.shared.probs, type = "loco")
+shared.covar <- merged.covar[threeway.shared.samples$top_muga, , drop = FALSE]
+rownames(shared.covar) <- threeway.shared.samples$sampleid
+
+# # adding shared data matrices with new_symbol in the column names
+shared.atac.data <- (counts.normZ[threeway.shared.samples$ATAC, threeway.shared.genes$peak_id])
+colnames(shared.atac.data) <- threeway.shared.genes$new_symbol
+rownames(shared.atac.data) <- threeway.shared.samples$sampleid
+
+shared.rna.data <- (exprZ.esc_rna[threeway.shared.samples$sampleid, threeway.shared.genes$ensembl_gene_id])
+colnames(shared.rna.data) <- threeway.shared.genes$new_symbol
+
+shared.prot.data <- (exprZ.esc_prot[threeway.shared.samples$sampleid, threeway.shared.genes$protein_id])
+colnames(shared.prot.data) <- threeway.shared.genes$new_symbol
+
+# get the peaks only for shared genes
+peaks.esc.overlap2 %>% 
+ filter( protein_id %in% threeway.shared.genes$protein_id) -> peaks.threeway.shared.genes
+
+
+# total significant pQTL for threeway shared genes
+peaks.esc_prot_annotated %>%  
+  filter( protein_id %in% threeway.shared.genes$protein_id, lod >7.5) -> significant_pQTL # 1589
+
+# annotating pQTL
+significant_pQTL %>% 
+  select( lod.esc_prot = lod, 
+          peak_chr,
+          protein_id,
+          local) %>% 
+  inner_join( .,
+              (peaks.threeway.shared.genes %>% 
+                 select( lod.esc_prot,
+                         peak_chr,
+                         protein_id,
+                         match)
+                     )
+  ) %>% 
+  distinct() %>% 
+  group_by( lod.esc_prot,peak_chr,protein_id) %>% 
+  mutate( match_all = paste0(match, collapse = ", ")) %>% 
+  select(-match) %>% 
+  ungroup %>% 
+  distinct() %>% 
+  mutate( match = case_when(
+    match_all == "esc_prot" ~"unique pQTL",
+    match_all == "shared_eQTL_pQTL" ~"shared e/pQTL",
+    match_all == "shared_caQTL_pQTL" ~"shared ca/pQTL",
+    match_all %in% c("shared_eQTL_pQTL, shared",
+                     "shared, shared_eQTL_pQTL",
+                     "shared_eQTL_pQTL, shared, shared_caQTL_eQTL",
+                     "shared_caQTL_eQTL, shared, shared_eQTL_pQTL",
+                     "shared_eQTL_pQTL, shared_caQTL_eQTL, shared",
+                     "shared, shared_caQTL_eQTL, shared_eQTL_pQTL",
+                     "shared, shared_eQTL_pQTL, shared_caQTL_eQTL",
+                     "shared_caQTL_eQTL, shared_eQTL_pQTL",
+                     "shared_eQTL_pQTL, shared_caQTL_eQTL",
+                     "shared, shared_caQTL_eQTL",
+                     "shared_caQTL_eQTL, shared",
+                     "shared"
+		
+
+                     )~"shared ca/e/pQTL"
+  )) -> significant_pQTL_annot 
+
+# I am adding caQTL/eQTL details, including allele effects to the significant pQTL.
+significant_pQTL_annot %>% 
+  rename( local.esc_prot = local) %>% 
+  left_join(
+    peaks.esc.overlap.wEffs %>%  
+      select( 
+        ensembl_gene_id, protein_id, peak_id,
+        peak_chr, gene_chr,
+        lod.esc_atac, lod.esc_rna, lod.esc_prot,
+        local.esc_atac, local.esc_rna, local.esc_prot,
+        interp_bp_peak.esc_atac, interp_bp_peak.esc_rna, interp_bp_peak.esc_prot,
+        paste0(LETTERS[1:8],".esc_atac"),
+        paste0(LETTERS[1:8],".esc_rna"),
+        paste0(LETTERS[1:8],".esc_prot"),
+        before.esc_atac, before.esc_rna, before.esc_prot,
+        after.esc_atac, after.esc_rna, after.esc_prot,
+        cumsum_bp.esc_atac, cumsum_bp.esc_rna, cumsum_bp.esc_prot,
+        cumsum_bp_peak.esc_atac, cumsum_bp_peak.esc_rna, cumsum_bp_peak.esc_prot
+        ) 
+    ) %>% 
+    mutate(qtl_id = paste0("qtl_", 1:n()),
+         eff_stat = case_when( is.na(A.esc_rna) ~ "missing eQTL",
+                               is.na(A.esc_prot) ~ "missing pQTL",
+                               is.na(A.esc_atac) ~ "missing caQTL",
+                               !is.na(A.esc_rna) & !is.na(A.esc_prot) & !is.na(A.esc_atac) ~ "all in") ) -> significant_pQTL_annot2
+
+# allele effect correlations for genes with all three measurements
+# let's fill in missing effects first for all.
+effs.df1 <- list()
+effs.df2 <- list()
+effs.df3 <- list()
+# pdf()
+subset_probs <- function(this_probs, this_chrom, this_markers) {
+  att <- attributes(this_probs)
+  att$names <- this_chrom
+  att$is_x_chr <- setNames(FALSE, this_chrom)
+  assertthat::assert_that(all(this_markers %in% dimnames(this_probs[[this_chrom]])[[3]]))
+  newprobs <- list(this_probs[[this_chrom]][, , this_markers, drop = FALSE])
+  names(newprobs) <- this_chrom
+  attributes(newprobs) <- att
+  newprobs
+}
+
+# fill in missing effects using the protein markers for caQTL + eQTL
+# so we are getting the allele effects at the pQTL peak for the missing values.
+for (i in 1:length((significant_pQTL_annot2$qtl_id))) {
+  #print(i)
+  this_chrom <- significant_pQTL_annot2$peak_chr[i]
+  gene.id <- significant_pQTL_annot2$ensembl_gene_id[i]
+  peak_id <- significant_pQTL_annot2$peak_id[i]
+  protein_id <- significant_pQTL_annot2$protein_id[i]
+  
+  if(significant_pQTL_annot2$eff_stat[i] =="all in"){
+    next
+  }
+  if( significant_pQTL_annot2$eff_stat[i] =="missing eQTL"){
+    
+    this_markers <- c(significant_pQTL_annot2$before.esc_prot[i],significant_pQTL_annot2$after.esc_prot[i])
+    probs_2marker <- subset_probs(threeway.shared.probs, this_chrom, this_markers)
+    id <- threeway.shared.genes[ threeway.shared.genes$ensembl_gene_id == gene.id,]$new_symbol[1]
+    effs_rna <- scan1blup(
+      genoprobs = probs_2marker,
+      pheno = (shared.rna.data[, id, drop = FALSE]),
+      kinship = shared.kinship[[this_chrom]], 
+      addcovar = shared.covar
+    )
+    significant_pQTL_annot2[i, paste0(LETTERS[1:8], ".esc_rna") ] <- as.list(colMeans(effs_rna)[LETTERS[1:8]])
+    
+  }
+  
+  if( significant_pQTL_annot2$eff_stat[i] =="missing caQTL" & !is.na(peak_id)){
+   
+    this_markers <- c(significant_pQTL_annot2$before.esc_prot[i],significant_pQTL_annot2$after.esc_prot[i])
+    probs_2marker <- subset_probs(threeway.shared.probs, this_chrom, this_markers)
+    id <- threeway.shared.genes[ threeway.shared.genes$peak_id == peak_id,]$new_symbol[1]
+    effs_atac <- scan1blup(
+      genoprobs = probs_2marker,
+      pheno = (shared.atac.data[, id, drop = FALSE]),
+      kinship = shared.kinship[[this_chrom]], 
+      addcovar = shared.covar
+    )
+    significant_pQTL_annot2[i, paste0(LETTERS[1:8], ".esc_atac") ] <- as.list(colMeans(effs_atac)[LETTERS[1:8]])
+  }
+  
+  # these are all significant pQTL so they all have effects! 
+  # if( significant_pQTL_annot2$eff_stat[i] =="missing pQTL"){
+  #   
+  #   this_markers <- c(significant_pQTL_annot2$before.esc_rna[i],significant_pQTL_annot2$after.esc_rna[i])
+  #   probs_2marker <- subset_probs(threeway.shared.probs, this_chrom, this_markers)
+  #   effs_prot <- scan1blup(
+  #     genoprobs = probs_2marker,
+  #     pheno = (shared.prot.data[, id, drop = FALSE]),
+  #     kinship = shared.kinship[[this_chrom]], addcovar = shared.covar
+  #   )
+  #   significant_pQTL_annot2[i, paste0(LETTERS[1:8], ".esc_prot") ] <- as.list(colMeans(effs_prot)[LETTERS[1:8]])
+  # }
+  
+  
+}
+
+# now let's get correlations.
+significant_pQTL_annot2 %>%
+  mutate(local = ifelse((local.esc_rna == TRUE | local.esc_prot == T | local.esc_atac == T), "local", "distant")) %>%
+  #mutate(qtl_id = paste0("qtl_", 1:n())) %>%
+  select(c(paste0(LETTERS[1:8], ".esc_rna"), "qtl_id")) %>%
+  column_to_rownames("qtl_id") %>%
+  t() -> shared.rna.effs
+
+significant_pQTL_annot2 %>%
+  mutate(local = ifelse((local.esc_rna == TRUE | local.esc_prot == T | local.esc_atac == T), "local", "distant")) %>%
+  #mutate(qtl_id = paste0("qtl_", 1:n())) %>%
+  select(c(paste0(LETTERS[1:8], ".esc_prot"), "qtl_id")) %>%
+  column_to_rownames("qtl_id") %>%
+  t() -> shared.prot.effs
+
+significant_pQTL_annot2 %>%
+  mutate(local = ifelse((local.esc_atac == TRUE | local.esc_rna == T | local.esc_atac == T), "local", "distant")) %>%
+  #mutate(qtl_id = paste0("qtl_", 1:n())) %>%
+  select(c(paste0(LETTERS[1:8], ".esc_atac"), "qtl_id")) %>%
+  column_to_rownames("qtl_id") %>%
+  t() -> shared.atac.effs
+
+significant_pQTL_corrs_rna_atac <- cbind(shared.rna.effs, shared.atac.effs)
+colnames(significant_pQTL_corrs_rna_atac) <- c(
+  paste0(colnames(shared.rna.effs), "_rna"),
+  paste0(colnames(shared.atac.effs), "_atac")
+)
+cor_rna_atac <- rcorr(significant_pQTL_corrs_rna_atac, type = c("pearson"))
+significant_pQTL_corrs_rna_atac_df <- data.frame(
+  cor = diag(cor_rna_atac$r[
+    endsWith(rownames(cor_rna_atac$r), "_atac"),
+    endsWith(colnames(cor_rna_atac$r), "_rna")
+  ]),
+  row = rownames(cor_rna_atac$r)[endsWith(rownames(cor_rna_atac$r), "_atac")],
+  column = colnames(cor_rna_atac$r)[endsWith(colnames(cor_rna_atac$r), "_rna")],
+  p_val = diag(cor_rna_atac$P[
+    endsWith(rownames(cor_rna_atac$P), "_atac"),
+    endsWith(colnames(cor_rna_atac$P), "_rna")
+  ]),
+  n = diag(cor_rna_atac$n[
+    endsWith(rownames(cor_rna_atac$n), "_atac"),
+    endsWith(colnames(cor_rna_atac$n), "_rna")
+  ])
+) %>% 
+  mutate(qtl_id = gsub("_atac", "", row)) %>%
+  #mutate(p_adj = p.adjust(p_val, "BH")) %>%
+  arrange(desc(abs(cor))) %>%
+  left_join(., (significant_pQTL_annot2 %>%
+    mutate(local = ifelse((local.esc_rna == TRUE | local.esc_atac == T), "local", "distant")) )
+    )
+
+
+significant_pQTL_corrs_rna_prot <- cbind(shared.rna.effs, shared.prot.effs)
+colnames(significant_pQTL_corrs_rna_prot) <- c(
+  paste0(colnames(shared.rna.effs), "_rna"),
+  paste0(colnames(shared.prot.effs), "_prot")
+)
+cor_rna_prot <- rcorr(significant_pQTL_corrs_rna_prot, type = c("pearson"))
+significant_pQTL_corrs_rna_prot_df <- data.frame(
+  cor = diag(cor_rna_prot$r[
+    endsWith(rownames(cor_rna_prot$r), "_prot"),
+    endsWith(colnames(cor_rna_prot$r), "_rna")
+  ]),
+  row = rownames(cor_rna_prot$r)[endsWith(rownames(cor_rna_prot$r), "_prot")],
+  column = colnames(cor_rna_prot$r)[endsWith(colnames(cor_rna_prot$r), "_rna")],
+  p_val = diag(cor_rna_prot$P[
+    endsWith(rownames(cor_rna_prot$P), "_prot"),
+    endsWith(colnames(cor_rna_prot$P), "_rna")
+  ]),
+  n = diag(cor_rna_prot$n[
+    endsWith(rownames(cor_rna_prot$n), "_prot"),
+    endsWith(colnames(cor_rna_prot$n), "_rna")
+  ])
+) %>%
+  mutate(qtl_id = gsub("_prot", "", row)) %>%
+  mutate(p_adj = p.adjust(p_val, method = "BH")) %>%
+  arrange(desc(abs(cor))) %>%
+  left_join(., (significant_pQTL_annot2 %>%
+    mutate(local = ifelse((local.esc_rna == TRUE | local.esc_prot == T), "local", "distant")) )
+    )
+
+
+significant_pQTL_corrs_prot_atac <- cbind(shared.prot.effs, shared.atac.effs)
+colnames(significant_pQTL_corrs_prot_atac) <- c(
+  paste0(colnames(shared.prot.effs), "_prot"),
+  paste0(colnames(shared.atac.effs), "_atac")
+)
+cor_prot_atac <- rcorr(significant_pQTL_corrs_prot_atac, type = c("pearson"))
+significant_pQTL_corrs_prot_atac_df <- data.frame(
+  cor = diag(cor_prot_atac$r[
+    endsWith(rownames(cor_prot_atac$r), "_atac"),
+    endsWith(colnames(cor_prot_atac$r), "_prot")
+  ]),
+  row = rownames(cor_prot_atac$r)[endsWith(rownames(cor_prot_atac$r), "_atac")],
+  column = colnames(cor_prot_atac$r)[endsWith(colnames(cor_prot_atac$r), "_prot")],
+  p_val = diag(cor_prot_atac$P[
+    endsWith(rownames(cor_prot_atac$P), "_atac"),
+    endsWith(colnames(cor_prot_atac$P), "_prot")
+  ]),
+  n = diag(cor_prot_atac$n[
+    endsWith(rownames(cor_prot_atac$n), "_atac"),
+    endsWith(colnames(cor_prot_atac$n), "_prot")
+  ])
+) %>%
+  mutate(qtl_id = gsub("_atac", "", row)) %>%
+  mutate(p_adj = p.adjust(p_val, method = "BH")) %>%
+  arrange(desc(abs(cor))) %>%
+  left_join(., (significant_pQTL_annot2 %>%
+    mutate(local = ifelse((local.esc_prot == TRUE | local.esc_atac == T), "local", "distant")) )
+    )
+
+
+# let's add correlations back to the table:
+
+significant_pQTL_annot2 %>% 
+  full_join( 
+     significant_pQTL_corrs_prot_atac_df %>% 
+      select( cor_atac_prot = cor, qtl_id)
+    ) %>% 
+  full_join(
+     significant_pQTL_corrs_rna_atac_df %>% 
+      select( cor_atac_rna = cor, qtl_id)
+  ) %>% 
+  full_join(
+    significant_pQTL_corrs_rna_prot_df %>% 
+      select( cor_rna_prot = cor, qtl_id)
+  ) ->  significant_pQTL_wcorr
+
+
+# Let's save each category to individual objects and filter acc to thresholds
+# all the unique pQTL with correlations. 
+significant_pQTL_wcorr %>% 
+  filter( match %in% c("unique pQTL")) -> uniq.pQTL.wcorr
+
+# shared eQTL/pQTL with correlations
+# note that atac-seq peak annotations will lead to repetitions, need to drop atac columns to get distinct eQTL/pQTL
+significant_pQTL_wcorr %>% 
+  filter( match %in% c("shared e/pQTL")) -> eQTL.pQTL.wcorr
+
+# shared caQTL/pQTL with correlations
+significant_pQTL_wcorr %>% 
+  filter( match %in% c("shared ca/pQTL")) %>% 
+  group_by(protein_id, peak_chr, lod.esc_prot, match) %>% 
+  slice_max( abs(cor_atac_prot))  %>% # take the atac peaks with highest correlation, gets rid off NAs
+  ungroup()  -> caQTL.pQTL.wcorr
+
+# shared ca/e/pQTL
+# keeping the atac-seq peak with the highest correlation only
+significant_pQTL_wcorr %>% 
+  filter( match %in% c("shared ca/e/pQTL") )   %>% 
+  group_by(protein_id, peak_chr, lod.esc_prot, match) %>% 
+  slice_max( abs(cor_atac_prot))  %>% # take the atac peaks with highest correlation, gets rid off NAs
+  ungroup()  -> threeway.shared.pQTL.wcorr
+
+
+# now I will update the pQTL classifications
+# get unique pQTL
+uniq.pQTL.wcorr %>% 
+  select( protein_id, lod.esc_prot, peak_chr) %>% 
+  distinct() %>% 
+  rbind(
+    eQTL.pQTL.wcorr %>% 
+      filter( abs(cor_rna_prot) < 0.5) %>% 
+      select( protein_id, peak_chr, lod.esc_prot) %>%
+      distinct()
+  ) %>% 
+  rbind(
+    caQTL.pQTL.wcorr %>% 
+      filter( abs(cor_atac_prot) < 0.5) %>% 
+      select( protein_id, peak_chr, lod.esc_prot) %>%
+      distinct() 
+  ) %>% 
+  rbind(
+    threeway.shared.pQTL.wcorr %>% 
+      filter( abs(cor_atac_prot) < 0.5 & abs(cor_rna_prot) <0.5 ) %>% 
+      select( protein_id, peak_chr, lod.esc_prot) %>%
+      distinct() 
+  ) %>% 
+  mutate( match = "unique pQTL") -> unique_pQTL
+# get shared eQTL/pQTL 
+eQTL.pQTL.wcorr %>% 
+  filter( abs(cor_rna_prot) >= 0.5) %>% # filter ones that moved to unique pQTL
+  select( protein_id, lod.esc_prot, peak_chr) %>% 
+  distinct() %>% 
+  rbind( 
+    threeway.shared.pQTL.wcorr %>% # move ones with abs(cor)<0.5 from shared ca/e/pQTL
+      filter( abs(cor_atac_prot) < 0.5 & abs(cor_rna_prot) >= 0.5 ) %>% 
+      select( protein_id, peak_chr, lod.esc_prot) %>%
+      distinct() 
+  ) %>% 
+  mutate( match = "shared e/pQTL") -> shared_eQTL_pQTL
+# get shared caQTL/pQTL 
+caQTL.pQTL.wcorr %>% 
+  filter( abs(cor_atac_prot) >=0.5) %>% # filter ones that moved to unique pQTL
+  select( protein_id, lod.esc_prot, peak_chr) %>% 
+  distinct() %>% 
+  rbind(
+    threeway.shared.pQTL.wcorr %>%  # move ones with abs(cor)<0.5 from shared ca/e/pQTL
+      filter( abs(cor_atac_prot) >= 0.5 & abs(cor_rna_prot) < 0.5 ) %>% 
+      select( protein_id, peak_chr, lod.esc_prot) %>%
+      distinct() 
+  ) %>% 
+  mutate( match = "shared ca/pQTL") -> shared_caQTL_pQTL
+# get shared ca/e/pQTL 
+threeway.shared.pQTL.wcorr %>%
+  filter( abs(cor_rna_prot) >= 0.5 & abs(cor_atac_prot) >= 0.5) %>%
+  select(protein_id, peak_chr, lod.esc_prot) %>%
+  distinct() %>% 
+  mutate( match = "shared ca/e/pQTL") -> shared_pQTL
+  
+significant_pQTL_annot_updated <- rbind(
+  shared_pQTL, 
+  unique_pQTL,
+  shared_caQTL_pQTL, 
+  shared_eQTL_pQTL
+) %>% 
+  left_join( select(significant_pQTL_annot2, -match, -match_all, -eff_stat)
+  ) %>% 
+    full_join( 
+     significant_pQTL_corrs_prot_atac_df %>% 
+      select( cor_atac_prot = cor, qtl_id)
+    ) %>% 
+  full_join(
+     significant_pQTL_corrs_rna_atac_df %>% 
+      select( cor_atac_rna = cor, qtl_id)
+  ) %>% 
+  full_join(
+    significant_pQTL_corrs_rna_prot_df %>% 
+      select( cor_rna_prot = cor, qtl_id)
+  ) %>% 
+  left_join(
+    peaks.threeway.shared.genes %>% select( protein_id,mgi_symbol, cumsum_bp_gene) %>% distinct()
+  ) 
+  
+rbind(
+  shared_pQTL, 
+  unique_pQTL,
+  shared_caQTL_pQTL, 
+  shared_eQTL_pQTL
+) %>%
+  left_join( significant_pQTL_annot %>% 
+               select(protein_id, peak_chr, lod.esc_prot, local )
+             ) %>% 
+  group_by(match) %>% # summarize(n = n_distinct(protein_id))
+  count(match, local) %>%
+  ungroup() %>% 
+  mutate( local = ifelse( local, "local", "distant")) %>% 
+  pivot_wider(
+    id_cols = match,names_from = "local", values_from = "n"
+  ) %>% 
+  mutate( local = round(100*local/(sum(local))),
+          distant = round(100*distant/(sum(distant)))
+  ) %>% 
+  select( `Overlap`=match , 
+          `local (%)` = local, 
+          `distant (%)`= distant) %>% 
+  mutate(
+    order = case_when( Overlap =="shared ca/e/pQTL"~1,
+                       Overlap =="shared e/pQTL"~2,
+                       Overlap == "unique pQTL"~3,
+                       Overlap =="shared ca/pQTL"~4)
+  ) %>% 
+  arrange(order) %>% 
+  select(-order) %>% 
+  DT::datatable(.,
+                extensions = 'Buttons',
+                rownames = FALSE, 
+                #filter="top",
+                options = list(dom = 't',
+                               buttons = c('copy'),
+                               pageLength = 5, 
+                               scrollX= TRUE
+                               ))
+
+
+```
+
+
+

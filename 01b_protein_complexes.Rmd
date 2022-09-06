@@ -11,6 +11,13 @@ output:
     code_folding: hide
 ---
 
+<style>
+p.caption {
+  font-size: 1em;
+}
+</style>
+
+
 
 ```{r setup}
 
@@ -20,5 +27,487 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 knitr::opts_knit$set(progress = FALSE)
 
 ```
+
+<br>
+<br>
+
+### Figure 2: Protein complex cohesiveness
+
+```{r complex_cor_plot, warning=FALSE, message=FALSE, cache=TRUE, results='hide'}
+
+# function to get pairwise correlations between complex members
+get_corr <- function(x, subset="none", shared = FALSE) {
+  
+  male_samples <-  covarTidy.esc_prot %>%  filter( sex =="M") 
+  female_samples <-covarTidy.esc_prot %>%  filter( sex =="F") 
+  
+  if( subset == "M"){
+    expr_prot <- expr.esc_prot[intersect(shared.samples, male_samples$sampleid),all.prots$protein_id,drop=FALSE ]
+    expr_rna  <- expr.esc_rna[ intersect(shared.samples, male_samples$sampleid),,drop=FALSE ]
+  }
+  if( subset == "F"){
+    expr_prot <- expr.esc_prot[ intersect(shared.samples, female_samples$sampleid),all.prots$protein_id,drop=FALSE ]
+    expr_rna  <- expr.esc_rna[ intersect(shared.samples, female_samples$sampleid),,drop=FALSE ]
+  }
+  if( subset =="none"){
+    expr_prot <- expr.esc_prot[ shared.samples,all.prots$protein_id,drop=FALSE ]
+    expr_rna  <- expr.esc_rna[ shared.samples,,drop=FALSE ]
+  }
+    
+  
+  ids <- filter(complex.gene.list, human_ids %in% unlist(x))
+  if ( shared ==T & length(intersect(shared.genes$ensembl_gene_id, ids$ensembl_gene_id)) > 1 &
+         length(intersect(all.prots$protein_id, ids$protein_id)) > 1 ) {
+       
+        cors.rna <- rcorr(expr_rna[, unique(intersect(shared.genes$ensembl_gene_id, ids$ensembl_gene_id)),drop=FALSE])
+        cors.rna.df <- tibble( col_rna = colnames(cors.rna$r)[col(cors.rna$r)] ,
+                         row_rna = rownames(cors.rna$r)[row(cors.rna$r)] ,
+                         cor_rna = c(cors.rna$r),
+                         n_rna = c(cors.rna$n),
+                         p_rna = c(cors.rna$P)) %>% 
+          left_join( .,
+                     select(all.genes, 
+                            ensembl_gene_id, mgi_symbol), 
+                     by=c("col_rna"="ensembl_gene_id")) %>% 
+          rename( ensembl_gene_id_col = col_rna,
+                  mgi_symbol_col = mgi_symbol) %>% 
+          left_join(.,
+                    select(all.genes, 
+                           ensembl_gene_id, mgi_symbol), 
+                    by=c("row_rna"="ensembl_gene_id")) %>% 
+          rename(ensembl_gene_id_row = row_rna,
+                 mgi_symbol_row = mgi_symbol) 
+
+        cors.prot <- rcorr(expr_prot[, unique(intersect(shared.genes$protein_id, ids$protein_id)),drop=FALSE])
+    
+        cors.prot.df <- tibble( col_prot = colnames(cors.prot$r)[col(cors.prot$r)] ,
+                         row_prot = rownames(cors.prot$r)[row(cors.prot$r)] ,
+                         cor_prot = c(cors.prot$r),
+                         n_prot = c(cors.prot$n),
+                         p_prot = c(cors.prot$P)) %>% 
+          left_join( .,
+                     select(all.prots2, 
+                            protein_id, ensembl_gene_id, mgi_symbol), 
+                     by=c("col_prot"="protein_id")) %>% 
+          rename( protein_id_col = col_prot ,
+                  mgi_symbol_col = mgi_symbol) %>% 
+          left_join( .,
+                     select(all.prots2, 
+                            ensembl_gene_id, protein_id, mgi_symbol), 
+                     by=c("row_prot"="protein_id")) %>% 
+          rename(protein_id_row = row_prot,
+                 mgi_symbol_row = mgi_symbol) 
+        
+        all.cors <- full_join( cors.prot.df, cors.rna.df) %>% 
+          mutate( diff = cor_prot - cor_rna) 
+        return(all.cors)
+  }
+  if(shared ==F & length(intersect(all.prots$protein_id, ids$protein_id)) > 1){
+    
+         cors.prot <- rcorr(expr_prot[, unique(intersect(shared.genes$protein_id, ids$protein_id)),drop=FALSE])
+    
+         cors.prot.df <- tibble( col_prot = colnames(cors.prot$r)[col(cors.prot$r)] ,
+                         row_prot = rownames(cors.prot$r)[row(cors.prot$r)] ,
+                         cor_prot = c(cors.prot$r),
+                         n_prot = c(cors.prot$n),
+                         p_prot = c(cors.prot$P)) %>% 
+          left_join( .,
+                     select(all.prots2, 
+                            protein_id, ensembl_gene_id, mgi_symbol), 
+                     by=c("col_prot"="protein_id")) %>% 
+          rename( protein_id_col = col_prot ,
+                  ensembl_gene_id_col = ensembl_gene_id,
+                  mgi_symbol_col = mgi_symbol) %>% 
+          left_join( .,
+                     select(all.prots2, 
+                            ensembl_gene_id, protein_id, mgi_symbol), 
+                     by=c("row_prot"="protein_id")) %>% 
+          rename(protein_id_row = row_prot,
+                 ensembl_gene_id_row = ensembl_gene_id,
+                 mgi_symbol_row = mgi_symbol) 
+        
+         return(cors.prot.df)
+  }
+  return(NA)
+  
+}
+
+# let's get correlations for all the complexes then filter later
+names(complex.genes) <- complexes$`Complex Name`
+complex_prot_cor <- complex.genes %>%
+  map( get_corr, shared = FALSE) 
+
+complex_genes <- complex.genes %>%  
+  enframe( "Complex Name","human_ids") %>%
+  unnest(human_ids) %>% 
+  left_join( complex.gene.list) %>% 
+  filter( !is.na(protein_id)) %>% 
+  group_by(ensembl_gene_id, protein_id, `Complex Name`) %>%  mutate( n = seq(1:n())) %>%  filter( n  == 1) %>%  select(-n) %>% ungroup() %>% #there are some human ids that match to the same gene/protein, we need to clean those up before doing means etc.
+  filter( !protein_id %in% (filter(peaks.esc_prot, lod > 7.5))$phenotype ) %>% # filter proteins with significant pQTL
+  group_by(`Complex Name`) %>% 
+  mutate( n_complex = n_distinct(protein_id)) %>% 
+  ungroup() %>% 
+  filter( n_complex > 4) %>% # filter complexes <5 
+  group_by(protein_id) %>% 
+  mutate( n_overlap = n_distinct(`Complex Name`)) %>% # add the overlap of proteins ONLY for the complexes we have in our analysis. 
+  ungroup() %>% 
+  group_by(`Complex Name`) %>% 
+  mutate(n_mean = mean(n_overlap)) %>% 
+  ungroup()
+
+#remaining complexes to analyze
+complexes_to_analyze <- complex_genes %>% 
+  select( `Complex Name`, n_complex, n_mean) %>% 
+  distinct()
+
+complex_prot_cor_df <- complex_prot_cor %>% 
+  enframe( "Complex Name", "data") %>% 
+  unnest("data") %>% 
+  filter( !is.na(protein_id_col), !is.na(protein_id_row) ) %>% # filter NAs if any.
+  filter( `Complex Name` %in% complexes_to_analyze$`Complex Name`) %>% # filter the complexes
+  filter( protein_id_col %in% complex_genes$protein_id,
+          protein_id_row %in% complex_genes$protein_id) # filter for the genes to analyze
+  
+complex_prot_cor_df %>% 
+  filter( protein_id_col != protein_id_row) %>% 
+  group_by(`Complex Name`) %>% 
+  summarise( median_prot = median(cor_prot, na.rm=TRUE)
+             ) %>% 
+  ungroup() -> mean_complex_prot 
+
+complex_prot_cor_df %>% 
+  filter( protein_id_col != protein_id_row) %>% 
+  group_by(`Complex Name`,protein_id_col) %>% 
+  summarize( cor_prot = median(cor_prot, na.rm=T)) %>% 
+  rename(protein_id = protein_id_col) %>% 
+  ungroup() -> mean_gene_complex_prot
+
+
+complex_genes  %>% 
+  left_join( .,
+             rename(mean_gene_complex_prot,
+                    cor_gene_prot = cor_prot) ) %>% 
+  left_join(., 
+            rename(mean_complex_prot, 
+                   cor_complex_prot = median_prot))-> complex_genes_annotated
+
+
+complexes_annotated <- mean_complex_prot %>% 
+  mutate( complex_q75 = quantile( (median_prot), 0.90) ,
+          complex_q25 = quantile( (median_prot), 0.1) ) %>% 
+  mutate( complex_type = case_when( median_prot > complex_q75 ~ "stable",
+                                    median_prot < complex_q25 ~ "variable",
+                                    (median_prot >= complex_q25 & median_prot <= complex_q75) ~ "none")
+          )  %>% 
+  select( `Complex Name`,complex_type)%>% 
+  left_join( select( complex_genes_annotated, 
+                     `Complex Name`, 
+                     cor_complex_prot, 
+                     n_complex,
+                     n_mean)) 
+
+```
+
+
+
+```{r Figure2, fig.height=5, fig.width=15, fig.cap="Figure 2: For each complex, pairwise Pearson correlations were calculated between all protein subunits and summarized as a boxplot. Boxplots are ordered and colored based on their median pairwise correlation, with more cohesive complexes on the left. Specific examples of the stable (most cohesive 10%) and variable (least cohesive 10%) complexes are highlighted"}
+
+complex_genes_annotated %>% 
+  left_join( select(complexes_annotated, `Complex Name`, complex_type)) %>% 
+  select( `Complex Name`, cor_complex_prot, cor_gene_prot) %>% 
+  distinct() %>% 
+  arrange( desc(cor_complex_prot) ) %>% 
+  mutate( label = factor(`Complex Name`, levels = unique(`Complex Name`))) %>% 
+  rename( `Complex Cohesivenes` = cor_complex_prot, 
+          `Average pairwise correlation` = cor_gene_prot) %>% 
+  ggboxplot(
+    x = "label",
+    y = "Average pairwise correlation",
+    fill = "Complex Cohesivenes",
+    sort.val = "desc",
+    xlab = "",
+    ylab = "Correlation",
+    width = 1
+  )+
+  theme_pubclean( base_size = 10, base_family ="poppins")+
+  theme(axis.text.x = element_text(angle = 0, hjust = 1, size = 0),
+        legend.position = "top",
+        legend.text = element_text(angle=15, hjust =0.1, size = 12),
+        legend.title = element_text(angle=0, hjust =0, vjust = 0.9, size = 16),
+        legend.title.align = 1,
+        axis.text.y = element_text(angle=0, size = 18),
+        axis.title.y = element_text(angle=90, size = 18),
+        axis.ticks.x = element_blank())+
+  labs( fill = "Complex\ncohesiveness")+
+  scale_fill_viridis_c()
+
+```
+
+<br>
+
+```{r Figure2_data, fig.cap="Data used to generate Figure 2."}
+
+complex_genes_annotated %>% 
+  left_join( select(complexes_annotated, `Complex Name`, complex_type)) %>% 
+  distinct() %>% 
+  mutate( mgi_symbol = toupper(mgi_symbol)) %>% 
+  select( `Complex Name`, 
+          `Complex Cohesivenes` = cor_complex_prot, 
+          `Protein` = mgi_symbol,
+          `Average pairwise correlation` = cor_gene_prot) %>% 
+  distinct() %>% 
+  mutate_if( is.numeric, round ,2 ) %>% 
+  create_dt()
+  
+
+```
+
+<br>
+
+#### Figure S2A: Variation in complex forming and other proteins
+
+
+```{r Figure_S2AB, fig.cap = "Figure S2A: Proteins that are part of a complex show less variation. Boxplots depicting % coefficient of variation of protein abundance for genes that are complex members and not complex members.", fig.width=3, fig.height=4}
+
+# Code used to generate Figure s2A
+var_mean_prot %>% 
+  mutate(sd = sqrt(var)) %>%
+  mutate(cv.prot = 100 * sd / (mean)) %>%
+  rename(mean.prot = mean, sd.prot = sd) %>% 
+  mutate(complex_member = ifelse(protein_id %in% complex.gene.list$protein_id, TRUE, FALSE)) %>%
+  ggboxplot(
+    x = "complex_member",
+    y = "cv.prot", col = "complex_member",  palette = c("gray","red"), legend = "none", width = 0.2
+  ) +
+  stat_compare_means(method = "anova", label.y = 1.8) +
+  ylab("% Coefficient of variation") + theme_pubclean(base_size = 12) + scale_y_log10() + xlab("Complex member") +
+  theme(legend.position = "none") -> fig_s2a
+
+ggarrange(fig_s2a, 
+          labels = "A", 
+          font.label = list( size = 20))
+
+
+```
+
+<br>
+
+#### Figure S2B: Protein co-abundance in DO mESCs in complex forming and other proteins
+
+```{r FigureS2B, fig.cap="Figure S2B: Proteins that physically interact show higher pairwise correlation in abundance than non-interacting proteins. Density distributions of pairwise Pearson correlations between complex forming proteins and others are plotted.", cache = TRUE, fig.height=4, fig.width=6}
+
+# Code used to generate Figure S2B
+
+# complex vs others
+non.complex.prot.cor <- rcorr(expr.esc_prot[, (filter(all.prots, !protein_id %in% complex.gene.list$protein_id))$protein_id])
+diag(non.complex.prot.cor$r) <- NA
+
+complex_prot_cor_df %>%
+  select( -ensembl_gene_id_col, -ensembl_gene_id_row) %>%
+  distinct() %>%
+  filter( protein_id_col != protein_id_row) -> dat.prot
+
+tibble(cor = (c(non.complex.prot.cor$r))) %>%
+  ggplot()+
+  geom_density( aes(x=cor,
+                    fill = "Other pairs"),
+                alpha =0.5) -> p1
+
+p1+geom_density(data= dat.prot,
+               aes(x=cor_prot,
+                    fill = "Complex forming pairs" ),
+                alpha = 0.5)+
+  scale_fill_manual( values = c("Complex forming pairs"="red",
+                        "Other pairs"="gray"))+
+  theme_pubclean(base_size = 14)+
+  xlab("Correlation")+
+  labs(fill="") -> plot_protein_coab
+
+ggarrange(plot_protein_coab, 
+          labels = "B",
+          font.label = list( size = 20))
+
+```
+
+<br>
+
+#### Figure S2C: Protein complexes that show sex effects 
+
+```{r Figure S2C, fig.cap="Figure S2C: Sex influences the co-regulation of complex subunits. Boxplots of pairwise Pearson correlations among complex subunits with significant differences between male and female cell lines are shown (One way ANOVA followed by Tukey’s HSD, ****: p value < 0.00005).", cache = TRUE, fig.width=12, fig.height=4}
+
+complex_prot_cor_male <- complex.genes %>%
+  map( get_corr, subset ="M") 
+
+complex_prot_cor_female <- complex.genes %>%
+  map( get_corr, subset ="F") 
+
+
+complex_prot_cor_female %>%
+  enframe( "Complex Name", "data") %>% 
+  unnest("data") %>% 
+  filter( !is.na(protein_id_col), !is.na(protein_id_row) ) %>% # filter NAs if any.
+  filter( `Complex Name` %in% complexes_to_analyze$`Complex Name`) %>% # filter the complexes
+  filter( protein_id_col %in% complex_genes$protein_id,
+          protein_id_row %in% complex_genes$protein_id) %>% 
+  group_by(`Complex Name`) %>% 
+  mutate(n_complex =n_distinct(protein_id_col) ) %>%
+  filter(n_complex > 4) %>% 
+  mutate( sex = "F") -> complex_prot_cor_female_df
+
+complex_prot_cor_male %>% 
+  enframe( "Complex Name", "data") %>% 
+  unnest("data") %>% 
+  filter( !is.na(protein_id_col), !is.na(protein_id_row) ) %>% # filter NAs if any.
+  filter( `Complex Name` %in% complexes_to_analyze$`Complex Name`) %>% # filter the complexes
+   filter( protein_id_col %in% complex_genes$protein_id,
+          protein_id_row %in% complex_genes$protein_id) %>% 
+  group_by(`Complex Name`) %>% 
+  mutate(n_complex =n_distinct(protein_id_col) ) %>%
+  filter(n_complex > 4) %>% 
+  mutate(sex ="M") -> complex_prot_cor_male_df
+
+complex_prot_cor_sexes <- rbind( complex_prot_cor_female_df, complex_prot_cor_male_df) %>% 
+  pivot_wider( names_from = sex, values_from = c("cor_prot","n_prot","p_prot"))
+
+# anova first
+# follow up on the ones with significance 
+rbind( complex_prot_cor_female_df, complex_prot_cor_male_df) %>% 
+  group_by(`Complex Name`) %>% 
+  rstatix::anova_test( cor_prot ~ sex)  %>% # default is two.sided.
+  rstatix::adjust_pvalue( method = "BH" ) %>%
+  rstatix::add_significance("p.adj") %>% 
+  as_tibble() -> complex_aov_results
+
+# passing the full data + doing the correction then filtering
+rbind( complex_prot_cor_female_df, complex_prot_cor_male_df) %>% 
+  group_by(`Complex Name`) %>% 
+  # rstatix::t_test( cor_prot ~ sex, paired = TRUE) %>% 
+  # rstatix::adjust_pvalue( method = "BH" ) %>%
+  rstatix::tukey_hsd( cor_prot ~sex) %>% 
+  rstatix::add_significance("p.adj") %>% 
+  filter(`Complex Name` %in% (filter(complex_aov_results, p.adj.signif != "ns"))$`Complex Name`,
+         p.adj.signif!= "ns") -> complex_tukeys_results
+
+
+rbind( complex_prot_cor_female_df, complex_prot_cor_male_df) %>% 
+  filter(`Complex Name` %in% filter(complex_tukeys_results, p.adj.signif != "ns")$`Complex Name`) %>% 
+  ggboxplot(
+    x = "sex",
+    y = "cor_prot",
+    col = "sex",
+    palette = "npg",
+    #facet.by = "`Complex Name`",
+    ylab = "Correlation",
+    ggtheme = theme_pubclean(base_size = 18, base_family = "Poppins"),
+    width = 0.2
+  )+
+  stat_pvalue_manual( data = filter(complex_tukeys_results, p.adj.signif != "ns"),
+                      label = "p.adj.signif",
+                      y.position = 1.1)+
+  ylim(-0.5, 1.2) -> p_complex_sex
+
+fig_s2c <- facet( p_complex_sex, 
+       facet.by = "`Complex Name`", 
+       panel.labs.font = list( size = 10),
+       nrow = 1)
+
+ggarrange(fig_s2c, 
+          labels = "C",
+          font.label = list( size = 22))
+
+```
+
+
+<br>
+
+#### Figure S2D: Complex membership in most stable and variable complexes
+
+```{r FigureS2D, fig.cap="Figure S2D: Variable complexes are more likely to have promiscuous subunits that are part of more than 2 complexes. Pairwise Pearson correlation coefficients plotted for all subunits that are part of stable (upper 10th percentile, most cohesive) and variable (lower 10th percentile, least cohesive) complexes where the proteins are colored by the number of complexes they belong to.", fig.width=16, fig.height=8}
+
+complexes_annotated %>% 
+  filter( complex_type != "none") %>% 
+  left_join( select(complex_prot_cor_df, cor_prot, protein_id = protein_id_row, `Complex Name`)) %>% 
+  left_join(select(complex_genes_annotated, `Complex Name`, protein_id, n_overlap, cor_complex_prot)) %>% 
+  arrange( desc(cor_complex_prot) )%>% 
+  mutate( label = factor(`Complex Name`, levels = unique(`Complex Name`))) %>% 
+  ggplot()+
+  aes(y = label,
+      x = cor_prot,
+      col = as_factor(n_overlap))+
+  geom_point(size = 3, alpha = 0.6)+
+  theme_pubclean(18)+
+  scale_color_viridis_d( option = "C")+
+  theme(
+        legend.text = element_text(angle=0, vjust=0, size =14))+
+  ylab("")+
+  xlab("Correlation")+
+  xlim(c(-1,1))+
+  labs(col = "Complex membership")+
+  facet_wrap(~complex_type, ncol = 2, nrow = 1, scales= "free") -> figure_s2d
+
+ggarrange(figure_s2d, 
+          labels = "D",
+          font.label = list( size = 24))
+
+
+```
+
+
+<br>
+
+#### Figure S2E: Proteins that belong to multiple complexes show variable behaviour in complex preference
+
+```{r, FigureS2E, fig.cap="Figure S2E: Promiscuous proteins vary in preference of complexes. Boxplots of median pairwise Pearson correlations of complex subunits across various complexes they are part of are plotted. The complex subunits are separated into two categories based on the total number of complexes they belong to.", fig.height=7, fig.width=10}
+
+promscs_genes <- complex_genes_annotated %>% 
+  filter( #promiscs==TRUE,
+          n_overlap > 2) %>% 
+  select( protein_id) %>% 
+  distinct() 
+
+complex_genes_annotated %>% 
+  filter( protein_id %in%  promscs_genes$protein_id) %>% 
+  group_by(protein_id) %>% 
+  #filter( n_distinct(`Complex Name`) > 2) %>% 
+  mutate( mean_prot = mean(cor_gene_prot, na.rm=T),
+          sd_prot = sqrt(var(cor_gene_prot, na.rm=T)),
+          cv_prot = abs(sd_prot/mean_prot) ,
+          n_complex = n()) %>% 
+  ungroup() %>% 
+  filter(!is.na(sd_prot), n_complex > 2)-> shared_complex_prots
+  
+
+shared_complex_prots %>% 
+  #filter( !protein_id %in% low_cor_genes$protein_id ) %>% 
+  mutate( size = ifelse( n_overlap > 3, "Complex membership >3","Complex membership = 3" )) %>% 
+  group_by(mgi_symbol) %>%
+  mutate(new_symbol = ifelse( protein_id =="ENSMUSP00000130611", "ACTB-208",
+                              ifelse( protein_id == "ENSMUSP00000098066", "ACTB-201", toupper(mgi_symbol) ))) %>% 
+  arrange( sd_prot) %>% 
+  mutate( label = factor(new_symbol , levels = unique(new_symbol)) ) %>% 
+  ggplot()+
+  aes( x = cor_gene_prot,
+       y = reorder(label, -sd_prot),
+      col = sd_prot
+       )+
+  geom_point( size = 4, alpha = 1)+
+  # geom_beeswarm( size = 3, alpha=1, groupOnX = F)+
+  # geom_boxplot( alpha =0.8,
+  #               outlier.colour = "darkgoldenrod1",
+  #               outlier.size = 3)+
+  theme_pubclean(base_size = 16)+
+  ylab("")+
+  xlab("Median correlation per gene per complex")+
+  scale_color_viridis(option = "magma", direction = 1)+
+  labs(col="Standard deviation")+
+  theme(legend.text = element_text(angle=45))+
+  facet_wrap(~size, scales="free_y") -> figure_s2e
+
+ggarrange(figure_s2e, 
+          labels = "E",
+          font.label = list( size = 20))
+```
+
+
 
 
