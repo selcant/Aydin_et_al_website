@@ -101,7 +101,7 @@ peaks.esc_prot_annotated %>%
 
 #### Table S5: List of all significant pQTL in Diversity Outbred mESCs.
 
-Significant pQTL (LOD > 7.5) are listed with gene annotations including ensembl protein and gene ID, chromosomal, gene start and end location. In addition, QTL peak details like the location of the peak in centi Morgan and base pairs, as well QTL type ( within 10Mb of the midpoint is classified as local) are listed for each individual pQTL. 
+Significant pQTL (LOD > 7.5) are listed with gene annotations including Eensembl protein and gene ID, chromosome number, gene start and end coordinates (bp). In addition, QTL details include the peak chromosome and location (cM) and physical (bp) coordinates, as well as the QTL type (local or distant), QTL peaks within 10Mb of the gene midpoint are classified as local.
 
 ```{r Table_S5_generation, warning=FALSE, message=FALSE}
 
