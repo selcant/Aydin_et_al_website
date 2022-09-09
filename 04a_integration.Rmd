@@ -543,7 +543,7 @@ rownames(pQTL_at_chr15_peak_eff_mat) <- LETTERS[1:8]
 factor3_chr15_qtl_effs_mat <- factor3_chr15_qtl_effs %>% 
   as.matrix()
 # get correlations
-factor3_pqtl_effs_corr <- cor(pQTL_at_chr15_peak_eff_mat, factor13_chr15_qtl_effs_mat)
+factor3_pqtl_effs_corr <- cor(pQTL_at_chr15_peak_eff_mat, factor3_chr15_qtl_effs_mat)
 factor3_pqtl_effs_wcorr <- factor3_pqtl_effs_corr %>% 
   as_tibble( rownames = "protein_id") %>% 
   rename( "pqtl_cor"= V1) 
