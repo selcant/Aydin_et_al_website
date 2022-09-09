@@ -188,14 +188,9 @@ save( prot.cor.genes,prot.cor.atacpeaks,max_cor_atac_prot, file = here( "_data/A
 
 ```
 
-
-```{r Figure3A, fig.cap="Figure 3A: ID1 protein abundance shows high correlation to many chromatin regions across the genome. Circos plot showing ATAC-seq peaks where chromatin accessibility is positively (red) and negatively (blue) correlated with ID1 protein abundance (n = 112, abs(correlation) >0.5).", fig.height=6, fig.width=6}
-
+```{r Figure3A_prep}
 
 load(here("../pQTL_website/_data/ATAC_prot_cor_data.RData"))
-
-
-library(circlize)
 
 prot.cor.atacpeaks %>%
   filter(n > 100) %>%
@@ -224,6 +219,13 @@ id1_cor_peaks %>%
   mutate( start = as.integer(start),
           end = as.integer(end)
           )  -> id1_gene
+
+```
+
+
+```{r Figure3A_plot, fig.cap="Figure 3A: ID1 protein abundance shows high correlation to many chromatin regions across the genome. Circos plot showing ATAC-seq peaks where chromatin accessibility is positively (red) and negatively (blue) correlated with ID1 protein abundance (n = 112, abs(correlation) >0.5).", fig.height=6, fig.width=6}
+
+library(circlize)
 
 # to add chromosomes
 chroms <- c(as.character(1:19), "X")
@@ -567,7 +569,7 @@ xfun::embed_file(here("Table_S4.xlsx"))
 
 ### Figure 3B: Covariation of proteome and transcriptome across samples
 
-```{r Figure3B, message=FALSE, warning=FALSE, cache=TRUE,fig.cap = "Figure 3B: DO mESCs show a wide range of correlations between their transcriptome and proteome. Histogram of Pearson correlation coefficients between the transcriptome and proteome of DO mESC cell lines with matching genotypes (n = 174).", fig.height=3, fig.width=5}
+```{r Figure3B_prep}
 
 shared.prot.names <- shared.genes %>%
   group_by(ensembl_gene_id) %>%
@@ -604,21 +606,28 @@ Figure3B_data <- prot_rna_sample_cor_df %>%
   rename( `Sample id` = sampleid_prot,
           `Correlation` = r)
 
+
+```
+
+
+```{r Figure3B, message=FALSE, warning=FALSE, cache=TRUE,fig.cap = "Figure 3B: DO mESCs show a wide range of correlations between their transcriptome and proteome. Histogram of Pearson correlation coefficients between the transcriptome and proteome of DO mESC cell lines with matching genotypes (n = 174).", fig.height=3, fig.width=5}
+
+
 Figure3B_data %>% 
   ggplot() +
   aes(x = Correlation) +
   geom_histogram( show.legend = F, binwidth = 0.01, alpha = 0.8) +
   geom_vline( aes(xintercept = median(Correlation,na.rm=T)), color = "black", linetype = "dashed", size = 1 )+
-  annotate( "text",
-            x = median_cor_rna_prot$med_r + 0.12,
-            label = paste0("Median = ",round(median_cor_rna_prot$med_r,2)), 
+  geom_text( mapping= aes(
+              x = median(Correlation,na.rm=T)-0.08,
+              label = stringr::str_wrap(paste0("Median = ",round(median(Correlation,na.rm=T),2)),7), 
+            ),
             y = 13,
-            size = 5
+            size = 6
+          
   )+
   xlab("Cell line correlation") +
   ylab("Count") +
-  #scale_fill_viridis_d(direction = -1, limits = c("ns", "p < 0.05", "p < 0.005", "p < 5e-10")) +
-  #labs(fill = "Significance") +
   theme_pubclean(base_size = 20)+
   xlim(0,0.6)+
   ylim(0,15)
@@ -876,8 +885,7 @@ ggarrange(fig_s3d,
 
 ### Figure 3C: Covariation of protein and transcript abundance across genes
 
-```{r Figure3C, fig.cap = "Figure 3C: Genes show variable agreement between transcript and protein abundance in DO mESCs. Histogram depicting the distribution of pairwise Pearson correlation coefficients between transcript and protein abundance of genes with characteristic GO terms overrepresented in each category annotated underneath in matching colors (green: significantly positively correlated, orange: significantly negatively correlated, purple: genes with little or no correlation).", warning=FALSE, message=FALSE, fig.width=10, fig.height=6, cache = TRUE, cache.lazy=FALSE}
-
+```{r Figure3C_prep, cache = TRUE, cache.lazy=FALSE}
 
 # get gene names for all protein ids
 shared.prot.names <- shared.genes %>%
@@ -952,9 +960,6 @@ ora_neg_cor$result %>%
   rbind( mutate( ora_pos_cor$result, group = "Positive correlation")) %>%
   rbind( mutate( ora_no_cor$result , group = "No correlation")) -> ora_all_corr
 
-# plot results
-y_colors <- RColorBrewer::brewer.pal(n = 4, name = "Dark2")
-
 Figure3C_data_part1 <- prot_rna_gene_cor_df %>% 
   mutate( 
     Group = case_when(
@@ -970,6 +975,54 @@ Figure3C_data_part1 <- prot_rna_gene_cor_df %>%
     `Correlation` = cor,
     Group
     )
+
+# get these:
+# negative: cellular respiration, mitochondrial ribosome
+# no correlation: Ribosome, Spliceosome OR  cytoplasmic translation, mRNA splicing, via spliceosome
+# positive correlation: extracellular region, lipid metabolic process
+# rank here is the order above
+# For adding the dots below the correlation histogram
+Figure3C_data_part2 <- ora_all_corr %>%
+  #filter(source %in% c("GO:BP","REAC","KEGG")) %>%
+  filter(term_name %in% c("cellular respiration", "mitochondrial ribosome",
+                          "cytoplasmic translation", "mRNA splicing, via spliceosome",
+                          "extracellular region", "lipid metabolic process","X-linked inheritance") ) %>%
+  select(term_name, intersection, p_value, group) %>%
+  arrange(desc(p_value), group) %>%
+  separate_rows(intersection) %>%
+  left_join(., prot_rna_gene_cor_df, by = c("intersection" = "mgi_symbol")) %>% 
+  mutate( group2 = case_when(   ( cor < 0 & p_adj < 0.05) ~ "negative",
+                               ( cor > 0 & p_adj < 0.05) ~ "positive",
+                               ( abs(cor) <= 0.05 ) ~ "low",
+                               ( abs(cor) > 0.05 & p_adj >= 0.05) ~ "none"
+                              )
+  )
+# For adding the labels next to dots in matching color
+Figure3C_data_part3 <- ora_all_corr %>%
+  filter(term_name %in% c("cellular respiration", "mitochondrial ribosome",
+                          "cytoplasmic translation", "mRNA splicing, via spliceosome",
+                          "extracellular region", "lipid metabolic process","X-linked inheritance") ) %>%
+  select(term_name, intersection, p_value, group) %>%
+  mutate(term_name = paste(term_name, formatC(p_value, format = "e", digits = 2))) %>%
+  separate_rows(intersection) %>%
+  left_join(., prot_rna_gene_cor_df, by = c("intersection" = "mgi_symbol")) %>%
+  group_by(term_name, group, p_value) %>%
+  dplyr::summarize(med_cor = median(cor, na.rm = TRUE)) %>%
+  mutate(y_col = ifelse(group == "Negative correlation", y_colors[2],y_colors[4]),
+         y_col = ifelse(group == "No correlation", y_colors[3], y_col),
+         y_col = ifelse(group == "Positive correlation", y_colors[1], y_col)) %>%
+  arrange(group, p_value) 
+
+
+```
+
+
+```{r Figure3C, fig.cap = "Figure 3C: Genes show variable agreement between transcript and protein abundance in DO mESCs. Histogram depicting the distribution of pairwise Pearson correlation coefficients between transcript and protein abundance of genes with characteristic GO terms overrepresented in each category annotated underneath in matching colors (green: significantly positively correlated, orange: significantly negatively correlated, purple: genes with little or no correlation).", warning=FALSE, message=FALSE, fig.width=10, fig.height=6}
+
+
+
+# plot results
+y_colors <- RColorBrewer::brewer.pal(n = 4, name = "Dark2")
 
 Figure3C_data_part1 %>% 
   ggplot() +
@@ -989,41 +1042,6 @@ Figure3C_data_part1 %>%
   xlim(-0.5, 1)+
   ylim(0,150)-> p1
 
-# get these:
-# negative: cellular respiration, mitochondrial ribosome
-# no correlation: Ribosome, Spliceosome OR  cytoplasmic translation, mRNA splicing, via spliceosome
-# positive correlation: extracellular region, lipid metabolic process
-# rank here is the order above
-Figure3C_data_part2 <- ora_all_corr %>%
-  #filter(source %in% c("GO:BP","REAC","KEGG")) %>%
-  filter(term_name %in% c("cellular respiration", "mitochondrial ribosome",
-                          "cytoplasmic translation", "mRNA splicing, via spliceosome",
-                          "extracellular region", "lipid metabolic process","X-linked inheritance") ) %>%
-  select(term_name, intersection, p_value, group) %>%
-  arrange(desc(p_value), group) %>%
-  separate_rows(intersection) %>%
-  left_join(., prot_rna_gene_cor_df, by = c("intersection" = "mgi_symbol")) %>% 
-  mutate( group2 = case_when(   ( cor < 0 & p_adj < 0.05) ~ "negative",
-                               ( cor > 0 & p_adj < 0.05) ~ "positive",
-                               ( abs(cor) <= 0.05 ) ~ "low",
-                               ( abs(cor) > 0.05 & p_adj >= 0.05) ~ "none"
-                              )
-  )
-
-Figure3C_data_part3 <- ora_all_corr %>%
-  filter(term_name %in% c("cellular respiration", "mitochondrial ribosome",
-                          "cytoplasmic translation", "mRNA splicing, via spliceosome",
-                          "extracellular region", "lipid metabolic process","X-linked inheritance") ) %>%
-  select(term_name, intersection, p_value, group) %>%
-  mutate(term_name = paste(term_name, formatC(p_value, format = "e", digits = 2))) %>%
-  separate_rows(intersection) %>%
-  left_join(., prot_rna_gene_cor_df, by = c("intersection" = "mgi_symbol")) %>%
-  group_by(term_name, group, p_value) %>%
-  dplyr::summarize(med_cor = median(cor, na.rm = TRUE)) %>%
-  mutate(y_col = ifelse(group == "Negative correlation", y_colors[2],y_colors[4]),
-         y_col = ifelse(group == "No correlation", y_colors[3], y_col),
-         y_col = ifelse(group == "Positive correlation", y_colors[1], y_col)) %>%
-  arrange(group, p_value) 
 
 Figure3C_data_part2 %>% 
   arrange(cor) %>% 

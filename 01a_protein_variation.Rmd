@@ -749,7 +749,7 @@ all.prots %>%
 
 ### Figure 1B: Detection bias in proteomics
 
-```{r Figure1B, fig.height=4, fig.width=5, fig.cap="Figure 1B: Protein detection rate is linked to transcript abundance. The probability of a gene to have protein abundance measurement given its average transcript abundance among 174 mESCs with both transcriptome and proteome data."}
+```{r Figure1B_prep}
 
 # get the list of protein coding genes with transcript abundance in DO mESCs
 all.prot_coding.genes <-  all.genes %>% 
@@ -799,6 +799,10 @@ get_props <- function(dat) {
 Figure1b_data <- get_props(prop.data) %>% 
   rename( `Probability of protein detection` = detection_probability,
           `Average transcript abundance` = avg_rna)
+```
+
+
+```{r Figure1B_plot, fig.height=4, fig.width=5, fig.cap="Figure 1B: Protein detection rate is linked to transcript abundance. The probability of a gene to have protein abundance measurement given its average transcript abundance among 174 mESCs with both transcriptome and proteome data."}
 
 prob_plot <- Figure1b_data %>% 
   ggplot() +
@@ -995,7 +999,7 @@ detection_plot
 
 ### Figure 1C: Principal component analysis of the pluripotent proteome
 
-```{r Figure1C, fig.cap="Figure 1C: Principal component analysis reveals sex as a significant source of variation among DO mESC proteomes. PC1 and PC2 for 190 mESCs are plotted and colored by sex.", fig.width=8, fig.height=4}
+```{r Figure1C_prep}
 
 # principal component analysis using pcaMethods::pca function.
 pca.prot <- pca(object = expr.esc_prot, 
@@ -1014,6 +1018,11 @@ Figure1c_data <- scores(pca.prot) %>%
     `Sample ID` = sampleid, 
     Sex = sex
   ) 
+
+```
+
+```{r Figure1C_plot, fig.cap="Figure 1C: Principal component analysis reveals sex as a significant source of variation among DO mESC proteomes. PC1 and PC2 for 190 mESCs are plotted and colored by sex.", fig.width=8, fig.height=4}
+
 
 Figure1c_data %>% 
   ggplot() +
@@ -1376,7 +1385,8 @@ gsva_rna_tukey %>%
 
 ```
 
-```{r Figure1D, fig.width=16, fig.height=4, fig.cap="Figure 1D: Enrichment scores obtained from GSVA for Gene Ontology Biological Processes (GO:BP) showing significant differences between mESCs with different sexes and genotypes at the Lifr locus are plotted. GO:BP DNA methylation, chromatin remodeling and ribosome biogenesis show significantly higher enrichment in males in comparison to females and, protein ADP-ribosylation shows significantly higher enrichment in mESCs with at least one copy of the reference allele in comparison to ones carrying two copies of the alternative allele at the *Lifr* locus (two-way anova followed by Tukey’s HSD, `*: p value < 0.05, ****: p value < 0.00005`)."}
+
+```{r Figure1D_prep}
 
 Figure1d_data <- gsva_results %>%
   filter( Category %in% c("GO:0006306", # DNA methylation
@@ -1409,6 +1419,12 @@ Figure1d_data <- gsva_results %>%
           Sex = sex, 
           `Lifr genotype`=lifr_geno, 
           `Significance`=p.adj.signif)
+
+```
+
+
+```{r Figure1D_plot, fig.width=16, fig.height=4, fig.cap="Figure 1D: Enrichment scores obtained from GSVA for Gene Ontology Biological Processes (GO:BP) showing significant differences between mESCs with different sexes and genotypes at the Lifr locus are plotted. GO:BP DNA methylation, chromatin remodeling and ribosome biogenesis show significantly higher enrichment in males in comparison to females and, protein ADP-ribosylation shows significantly higher enrichment in mESCs with at least one copy of the reference allele in comparison to ones carrying two copies of the alternative allele at the *Lifr* locus (two-way anova followed by Tukey’s HSD, `*: p value < 0.05, ****: p value < 0.00005`)."}
+
 
 Figure1d_data %>% 
   ggplot()+

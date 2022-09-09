@@ -32,15 +32,7 @@ knitr::opts_knit$set(progress = FALSE)
 
 ### Figure 4A: Genetic map of the pluripotent proteome
 
-
-```{r Figure4A, message=FALSE, warning=FALSE, fig.cap="Figure 4A: Genetic mapping identifies 1,677 significant pQTL (LOD >7.5, permutation genome-wide p < 0.05, FDR = 0.06) where 1,056 are local (within 10Mb of the protein coding gene, seen on the diagonal) and 621 are distant (off the diagonal). pQTL are plotted across the genome where the x-axis shows the location of the pQTL and the y-axis shows the midpoint of the protein coding gene.", fig.height=6, fig.width=7}
-
-# graphical prep for chromosome locations
-chroms <- c(as.character(1:19), "X")
-chrom_lens <- c( 195431559, 182107670, 160017104, 156496071, 151833620, 149721874, 145434693, 129399468, 124582650, 130685419, 122078650, 120120622 ,120387272, 124867725, 104015452, 98180002, 94984432, 90672596, 61417310 , 171028300)
-names(chrom_lens) <- chroms
-chrom_lens_offset <- cumsum(chrom_lens) - chrom_lens
-chrom_lens_midpt <- chrom_lens_offset + chrom_lens / 2
+```{r Figure4A_prep}
 
 # prepping data
 peaks.esc_prot_annotated <- peaks.esc_prot %>%
@@ -63,6 +55,19 @@ Figure4A_data <- peaks.esc_prot_annotated %>%
     `Offsetted QTL peak location (bp)` = cumsum_bp_peak,
     `Offsetted gene midpoint (bp)` = cumsum_bp_gene
   )
+
+
+```
+
+```{r Figure4A, message=FALSE, warning=FALSE, fig.cap="Figure 4A: Genetic mapping identifies 1,677 significant pQTL (LOD >7.5, permutation genome-wide p < 0.05, FDR = 0.06) where 1,056 are local (within 10Mb of the protein coding gene, seen on the diagonal) and 621 are distant (off the diagonal). pQTL are plotted across the genome where the x-axis shows the location of the pQTL and the y-axis shows the midpoint of the protein coding gene.", fig.height=6, fig.width=7}
+
+
+# graphical prep for chromosome locations
+chroms <- c(as.character(1:19), "X")
+chrom_lens <- c( 195431559, 182107670, 160017104, 156496071, 151833620, 149721874, 145434693, 129399468, 124582650, 130685419, 122078650, 120120622 ,120387272, 124867725, 104015452, 98180002, 94984432, 90672596, 61417310 , 171028300)
+names(chrom_lens) <- chroms
+chrom_lens_offset <- cumsum(chrom_lens) - chrom_lens
+chrom_lens_midpt <- chrom_lens_offset + chrom_lens / 2
 
 # prepping chromosome segments for coloring
 chrom_segments <- tibble( start = 0, 
