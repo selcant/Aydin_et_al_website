@@ -59,7 +59,7 @@ Figure4A_data <- peaks.esc_prot_annotated %>%
 
 ```
 
-```{r Figure4A, message=FALSE, warning=FALSE, fig.cap="Figure 4A: Genetic mapping identifies 1,677 significant pQTL (LOD >7.5, permutation genome-wide p < 0.05, FDR = 0.06) where 1,056 are local (within 10Mb of the protein coding gene, seen on the diagonal) and 621 are distant (off the diagonal). pQTL are plotted across the genome where the x-axis shows the location of the pQTL and the y-axis shows the midpoint of the protein coding gene.", fig.height=6, fig.width=7}
+```{r Figure4A_plot, message=FALSE, warning=FALSE, fig.cap="Figure 4A: Genetic mapping identifies 1,677 significant pQTL (LOD >7.5, permutation genome-wide p < 0.05, FDR = 0.06) where 1,056 are local (within 10Mb of the protein coding gene, seen on the diagonal) and 621 are distant (off the diagonal). pQTL are plotted across the genome where the x-axis shows the location of the pQTL and the y-axis shows the midpoint of the protein coding gene.", fig.height=6, fig.width=7}
 
 
 # graphical prep for chromosome locations
@@ -110,7 +110,7 @@ pqtl_plot
 
 <br>
 
-```{r Data_for_4A, fig.cap="Significant pQTL details plotted in Figure 4A.", warning=FALSE, message=FALSE}
+```{r Figure_4A_data, fig.cap="Significant pQTL details plotted in Figure 4A.", warning=FALSE, message=FALSE}
 
 
 Figure4A_data %>% 
@@ -174,8 +174,7 @@ xfun::embed_file(here("Table_S5.xlsx"))
 
 ### Figure 4B: Correlation of allele effects
 
-```{r Figure_4B, fig.cap = "Figure 4B: Majority of co-mapping eQTL and pQTL show high agreement in haplotype effects. Histogram of pairwise Pearson correlation coefficients between inferred allele effects from eQTL and pQTL scans for each gene with a co-mapping QTL. The bars are colored by the significance of the pairwise correlation.", warning=FALSE, message=FALSE, fig.height=6, fig.width=5}
-
+```{r Figure_4B_prep}
 
 shared.qtl <- peaks.shared.genes %>% 
   filter(match %in% c("shared","shared_eQTL_pQTL") & 
@@ -240,6 +239,12 @@ Figure4B_data <- shared.qtl.eff.corrs.df %>%
     `eQTL peak location (bp)` = interp_bp_peak.esc_rna
   )
 
+```
+
+
+```{r Figure_4B_plot, fig.cap = "Figure 4B: Majority of co-mapping eQTL and pQTL show high agreement in haplotype effects. Histogram of pairwise Pearson correlation coefficients between inferred allele effects from eQTL and pQTL scans for each gene with a co-mapping QTL. The bars are colored by the significance of the pairwise correlation.", warning=FALSE, message=FALSE, fig.height=6, fig.width=5}
+
+
 Figure4B_data %>% 
   ggplot() +
   aes(y = `Correlation between allele effects`, col = Significance, fill = Significance) +
@@ -258,7 +263,7 @@ allele_eff_cor_plot
 ```
 
 
-```{r Figure4B_data, fig.cap="Correlation values used in plotting in Figure 4B", warning=FALSE, message=FALSE}
+```{r Figure_4B_data, fig.cap="Correlation values used in plotting in Figure 4B", warning=FALSE, message=FALSE}
 
 Figure4B_data %>% 
   mutate_if( is.numeric, round, 2) %>% 
@@ -272,8 +277,8 @@ Figure4B_data %>%
 
 ### Figure 4C: Overlapping QTL examples
 
+```{r Figure_4C_prep}
 
-```{r Figure_4C, fig.cap = "Figure 4C: Examples of significant pQTL where the influence of genetic variation is seen at all three molecular layers are shown. On the left, LOD scores obtained from genome scans using chromatin accessibility (caQTL), transcript (eQTL) and protein abundance (pQTL) of the associated gene is plotted with the protein coding gene location annotated on the x-axis. On the right, haplotype effects obtained from the caQTL, eQTL and pQTL peaks are shown.", message=FALSE, warning=FALSE, fig.height=10, fig.width=12}
 
 # BSPRY plot
 bspry_qtl <- peaks.esc.overlap2 %>% 
@@ -298,42 +303,6 @@ peaks.esc.overlap.wEffs %>%
           paste0(LETTERS[1:8], ".esc_prot")
   ) -> bspry_effects
 
-# Allele effects plot
-bspry_effects %>% 
-  pivot_longer( cols = c( paste0(LETTERS[1:8], ".esc_atac"),
-          paste0(LETTERS[1:8], ".esc_rna"),
-          paste0(LETTERS[1:8], ".esc_prot")), 
-          names_to = c("effect"),
-          values_to = "value") %>% 
-  separate(effect, sep ="[.]", into = c("Strain","QTL")) %>% 
-  mutate( Strain = case_when( Strain == "A" ~ "A/J",
-                              Strain == "B" ~ "B6",
-                              Strain == "C" ~ "129",
-                              Strain == "D" ~ "NOD",
-                              Strain == "E" ~ "NZO",
-                              Strain == "F" ~ "CAST",
-                              Strain == "G" ~ "PWK",
-                              Strain == "H" ~ "WSB")) %>% 
-  mutate( QTL = factor(QTL, levels =c("esc_atac","esc_rna","esc_prot"))) %>% 
-  ggplot()+
-  aes( x = Strain,
-       y = value, 
-       col = QTL,
-       group = QTL)+
-  geom_point(size = 4, show.legend = FALSE)+
-  geom_line(show.legend = T, size = 1.2)+
-  theme_pubclean(base_size = 18)+
-  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
-                      labels = c("caQTL","eQTL","pQTL"))+
-  ylab("Haplotype effects")+
-  xlab("")+
-  ylim(-2,1.1)+
-  geom_hline( yintercept = 0)+
-  theme(axis.line.x = element_blank(),
-        axis.title = element_text(size = 18))+
-  labs(col ="QTL type")+
-  coord_flip( clip ="off")+
-  theme(legend.position = "none") -> bspry_haplotype_plot
 
 # get QTL scans
 bspry_caqtl <- scan1(genoprobs = probs.esc_atac,
@@ -363,28 +332,6 @@ bspry_caqtl %>%
     bspry_pqtl %>% as.data.frame() %>% rename( pqtl = pheno1)
   ) -> bspry_qtl_scans
 
-# LOD plots
-bspry_qtl_scans %>% 
-  filter( chr == bspry_qtl$peak_chr) %>% 
-  pivot_longer( cols = c("caqtl","eqtl","pqtl"), names_to = "qtl_type", values_to = "lod") %>% 
-  mutate( qtl_type = factor( qtl_type, levels = c("caqtl","eqtl","pqtl"))) %>% 
-  ggplot()+
-    aes( 
-      x= pos_bp,
-      y = lod,
-      col = qtl_type
-      )+
-    geom_line( size = 1.5)+
-    theme_pubclean( base_size = 18)+
-  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
-                      labels = c("caQTL","eQTL","pQTL"))+
-  xlab(paste0("Chr ",bspry_qtl$peak_chr," location (bp)"))+
-  ylab( "LOD score")+
-  labs(col = "QTL type")+
-  geom_segment( x = bspry_qtl$gene_start, xend = bspry_qtl$gene_end , y = 0, yend = 1, col = "black", size = 2) +
-  annotate( "text", x= bspry_qtl$midpoint, y = 2, label ="BSPRY", size =6) -> bspry_lod_plot
-
-# TFCP2L1 plot
 tfcp2l1_qtl <- peaks.esc.overlap2 %>% 
   filter( lod.esc_prot >7.5, mgi_symbol =="Tfcp2l1", match =="shared")
 
@@ -397,43 +344,6 @@ peaks.esc.overlap.wEffs %>%
           paste0(LETTERS[1:8], ".esc_rna"),
           paste0(LETTERS[1:8], ".esc_prot")
   ) -> tfcp2l1_effects
-
-# Allele effects plot
-tfcp2l1_effects %>% 
-    pivot_longer( cols = c( paste0(LETTERS[1:8], ".esc_atac"),
-          paste0(LETTERS[1:8], ".esc_rna"),
-          paste0(LETTERS[1:8], ".esc_prot")), 
-          names_to = c("effect"),
-          values_to = "value") %>% 
-  separate(effect, sep ="[.]", into = c("Strain","QTL")) %>% 
-  mutate( Strain = case_when( Strain == "A" ~ "A/J",
-                              Strain == "B" ~ "B6",
-                              Strain == "C" ~ "129",
-                              Strain == "D" ~ "NOD",
-                              Strain == "E" ~ "NZO",
-                              Strain == "F" ~ "CAST",
-                              Strain == "G" ~ "PWK",
-                              Strain == "H" ~ "WSB")) %>% 
-  mutate( QTL = factor(QTL, levels =c("esc_atac","esc_rna","esc_prot"))) %>% 
-  ggplot()+
-  aes( x = Strain,
-       y = value, 
-       col = QTL,
-       group = QTL)+
-  geom_point(size = 4, show.legend = FALSE)+
-  geom_line(show.legend = T, size = 1.2)+
-  theme_pubclean(base_size = 18)+
-  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
-                      labels = c("caQTL","eQTL","pQTL"))+
-  ylab("Haplotype effects")+
-  xlab("")+
-  ylim(-2,1.1)+
-  geom_hline( yintercept = 0)+
-  theme(axis.line.x = element_blank(),
-        axis.title = element_text(size = 18))+
-  labs(col ="QTL type")+
-  coord_flip( clip ="off")+
-  theme(legend.position = "none")  -> tfcp2l1_haplotype_plot
 
 # Get QTL scans
 tfcp2l1_caqtl <- scan1(genoprobs = probs.esc_atac,
@@ -462,54 +372,25 @@ tfcp2l1_caqtl %>%
     tfcp2l1_pqtl %>% as.data.frame() %>% rename( pqtl = pheno1)
   ) -> tfcp2l1_qtl_scans
 
-# LOD plots
-tfcp2l1_qtl_scans %>% 
-  filter( chr == tfcp2l1_qtl$peak_chr) %>% 
-  pivot_longer( cols = c("caqtl","eqtl","pqtl"), names_to = "qtl_type", values_to = "lod") %>% 
-  mutate( qtl_type = factor( qtl_type, levels = c("caqtl","eqtl","pqtl"))) %>% 
-  ggplot()+
-    aes( 
-      x= pos_bp,
-      y = lod,
-      col = qtl_type
-      )+
-    geom_line( size = 1.5)+
-    theme_pubclean( base_size = 18)+
-  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
-                      labels = c("caQTL","eQTL","pQTL"))+
-  xlab(paste0("Chr ",tfcp2l1_qtl$peak_chr," location (bp)"))+
-  ylab( "LOD score")+
-  labs(col = "QTL type")+
-  geom_segment( x = tfcp2l1_qtl$gene_start, xend = tfcp2l1_qtl$gene_end , y = 0, yend = 1, col = "black", size = 2) +
-  annotate( "text", x= tfcp2l1_qtl$midpoint, y = 2, label ="TFCP2L1", size =6) +
-  ylim(0,15)-> tfcp2l1_lod_plot
 
-bspry_plot <- ggarrange( bspry_lod_plot, bspry_haplotype_plot,
-                         common.legend = TRUE, 
-                         widths = c(0.7, 0.4))
-
-tfcp2l1_plot <- ggarrange( tfcp2l1_lod_plot, tfcp2l1_haplotype_plot, 
-                           common.legend = TRUE, 
-                           widths = c(0.7, 0.4) )
-
-figure_4C <- ggarrange( bspry_plot, tfcp2l1_plot, nrow = 2)
-
-
-figure_4C
-
-```
-
-<br>
-
-```{r Figure4C_data, fig.cap="QTL scans used to generate Figure 4C."}
-
-bspry_qtl_scans %>% 
+# merge data
+Figure_4C_data_scans <- bspry_qtl_scans %>% 
   filter( chr == 4) %>% 
   mutate( Protein = "BSPRY") %>% 
+  cbind(
+    all.prots2 %>% 
+      filter( mgi_symbol =="Bspry") %>% 
+      select( gene_start, gene_end, midpoint)
+  ) %>% 
   rbind(
     tfcp2l1_qtl_scans %>% 
       filter( chr == 1) %>% 
-      mutate( Protein = "TFCP2L1") 
+      mutate( Protein = "TFCP2L1") %>% 
+      cbind(
+            all.prots2 %>% 
+              filter( mgi_symbol =="Tfcp2l1") %>% 
+              select( gene_start, gene_end, midpoint)
+      )
     ) %>% 
   select(
     Protein, 
@@ -519,21 +400,13 @@ bspry_qtl_scans %>%
     pos_bp,
     caqtl,
     eqtl,
-    pqtl
-  ) %>% 
-  mutate_if( is.numeric, round ,2) %>% 
-  create_dt()
+    pqtl,
+    gene_start,
+    gene_end, 
+    midpoint
+  )
 
-
-
-```
-
-<br>
-
-```{r Figure4C_data2, fig.cap="Haplotype effects used to generate Figure 4C."}
-
-
-bspry_effects %>% 
+Figure_4C_data_effs <- bspry_effects %>% 
   mutate( Protein = "BSPRY") %>% 
   rbind(
     tfcp2l1_effects %>% 
@@ -558,7 +431,141 @@ bspry_effects %>%
     QTL == "esc_atac"~"caQTL",
     QTL == "esc_rna"~"eQTL",
     QTL == "esc_prot"~"pQTL" )
-  ) %>%
+  ) 
+
+```
+
+
+```{r Figure_4C_plot, fig.cap = "Figure 4C: Examples of significant pQTL where the influence of genetic variation is seen at all three molecular layers are shown. On the left, LOD scores obtained from genome scans using chromatin accessibility (caQTL), transcript (eQTL) and protein abundance (pQTL) of the associated gene is plotted with the protein coding gene location annotated on the x-axis. On the right, haplotype effects obtained from the caQTL, eQTL and pQTL peaks are shown.", message=FALSE, warning=FALSE, fig.height=10, fig.width=12}
+
+# qtl colors
+qtl.colors <- c( rna = "#228833", 
+                 prot = "#4477AA", 
+                 atac = "#EE6677",
+                 shared = "#AA3377")
+
+# Allele effects plot
+Figure_4C_data_effs %>% 
+  filter( Protein =="BSPRY") %>% 
+  ggplot()+
+  aes( x = Strain,
+       y = value, 
+       col = QTL,
+       group = QTL)+
+  geom_point(size = 4, show.legend = FALSE)+
+  geom_line(show.legend = T, size = 1.2)+
+  theme_pubclean(base_size = 18)+
+  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
+                      labels = c("caQTL","eQTL","pQTL"))+
+  ylab("Haplotype effects")+
+  xlab("")+
+  ylim(-2,1.1)+
+  geom_hline( yintercept = 0)+
+  theme(axis.line.x = element_blank(),
+        axis.title = element_text(size = 18))+
+  labs(col ="QTL type")+
+  coord_flip( clip ="off")+
+  theme(legend.position = "none") -> bspry_haplotype_plot
+
+
+# LOD plots
+Figure_4C_data_scans %>% 
+  filter( Protein =="BSPRY") %>% 
+  pivot_longer( cols = c("caqtl","eqtl","pqtl"), names_to = "qtl_type", values_to = "lod") %>% 
+  mutate( qtl_type = factor( qtl_type, levels = c("caqtl","eqtl","pqtl"))) %>% 
+  ggplot()+
+    aes( 
+      x= pos_bp,
+      y = lod,
+      col = qtl_type
+      )+
+    geom_line( size = 1.5)+
+    theme_pubclean( base_size = 18)+
+  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
+                      labels = c("caQTL","eQTL","pQTL"))+
+  xlab(paste0("Chr ",bspry_qtl$peak_chr," location (bp)"))+
+  ylab( "LOD score")+
+  labs(col = "QTL type")+
+  geom_segment( mapping = aes(x = gene_start, xend = gene_end), y = 0, yend = 1, col = "black", size = 2) +
+  geom_text( mapping = aes( x=midpoint), y = 2, label ="Bspry", size =6, col = "black", fontface = "italic") -> bspry_lod_plot
+
+# TFCP2L1 plot
+# Allele effects plot
+Figure_4C_data_effs %>% 
+  filter( Protein =="TFCP2L1") %>% 
+  ggplot()+
+  aes( x = Strain,
+       y = value, 
+       col = QTL,
+       group = QTL)+
+  geom_point(size = 4, show.legend = FALSE)+
+  geom_line(show.legend = T, size = 1.2)+
+  theme_pubclean(base_size = 18)+
+  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
+                      labels = c("caQTL","eQTL","pQTL"))+
+  ylab("Haplotype effects")+
+  xlab("")+
+  ylim(-2,1.1)+
+  geom_hline( yintercept = 0)+
+  theme(axis.line.x = element_blank(),
+        axis.title = element_text(size = 18))+
+  labs(col ="QTL type")+
+  coord_flip( clip ="off")+
+  theme(legend.position = "none")  -> tfcp2l1_haplotype_plot
+
+
+# LOD plots
+Figure_4C_data_scans %>% 
+  filter( Protein =="TFCP2L1") %>% 
+  pivot_longer( cols = c("caqtl","eqtl","pqtl"), names_to = "qtl_type", values_to = "lod") %>% 
+  mutate( qtl_type = factor( qtl_type, levels = c("caqtl","eqtl","pqtl"))) %>% 
+  ggplot()+
+    aes( 
+      x= pos_bp,
+      y = lod,
+      col = qtl_type
+      )+
+    geom_line( size = 1.5)+
+    theme_pubclean( base_size = 18)+
+  scale_color_manual( values = c(qtl.colors[["atac"]],qtl.colors[["rna"]],qtl.colors[["prot"]]), 
+                      labels = c("caQTL","eQTL","pQTL"))+
+  xlab(paste0("Chr ",tfcp2l1_qtl$peak_chr," location (bp)"))+
+  ylab( "LOD score")+
+  labs(col = "QTL type")+
+geom_segment( mapping = aes(x = gene_start, xend = gene_end), y = 0, yend = 1, col = "black", size = 2) +
+  geom_text( mapping = aes( x= midpoint), y = 2, label ="Tfcp2l1", size =6, col = "black", fontface = "italic") +
+  ylim(0,15)-> tfcp2l1_lod_plot
+
+bspry_plot <- ggarrange( bspry_lod_plot, bspry_haplotype_plot,
+                         common.legend = TRUE, 
+                         widths = c(0.7, 0.4))
+
+tfcp2l1_plot <- ggarrange( tfcp2l1_lod_plot, tfcp2l1_haplotype_plot, 
+                           common.legend = TRUE, 
+                           widths = c(0.7, 0.4) )
+
+figure_4C <- ggarrange( bspry_plot, tfcp2l1_plot, nrow = 2)
+
+
+figure_4C
+
+```
+
+<br>
+
+```{r Figure4C_data, fig.cap="QTL scans used to generate Figure 4C."}
+
+ Figure_4C_data_scans %>% 
+  mutate_if( is.numeric, round ,2) %>% 
+  create_dt()
+
+```
+
+<br>
+
+```{r Figure4C_data2, fig.cap="Haplotype effects used to generate Figure 4C."}
+
+Figure_4C_data_effs %>%
   mutate_if(is.numeric , round, 2) %>% 
   create_dt()
 
@@ -570,8 +577,7 @@ bspry_effects %>%
 
 ### Figure 4D: pQTL hotspots
 
-
-```{r Figure_4D, warning=FALSE, message=FALSE, fig.cap = "Figure 4D: Histogram depicting the number of total distant pQTL forming hotspots across the genome.", fig.width=7, fig.height=3}
+```{r Figure_4D_prep}
 
 # Get pQTL hotspots
 # prep the objects
@@ -657,6 +663,19 @@ Figure4D_data <- pqtl_counts %>%
     `Offsetted hotspot midpoint (bp)` = midpoint_offset,
     `# of distant pQTL` = distant_esc_prot
   )
+
+```
+
+
+```{r Figure_4D_plot, warning=FALSE, message=FALSE, fig.cap = "Figure 4D: Histogram depicting the number of total distant pQTL forming hotspots across the genome.", fig.width=7, fig.height=3}
+
+
+# graphical prep for chromosome locations
+chroms <- c(as.character(1:19), "X")
+chrom_lens <- c( 195431559, 182107670, 160017104, 156496071, 151833620, 149721874, 145434693, 129399468, 124582650, 130685419, 122078650, 120120622 ,120387272, 124867725, 104015452, 98180002, 94984432, 90672596, 61417310 , 171028300)
+names(chrom_lens) <- chroms
+chrom_lens_offset <- cumsum(chrom_lens) - chrom_lens
+chrom_lens_midpt <- chrom_lens_offset + chrom_lens / 2
 
 Figure4D_data %>% 
   ggplot()+
@@ -1032,25 +1051,27 @@ ribo_qtl_plot
 
 ### Figure 4E: Stoichometric buffering example
 
-```{r Figure4E, fig.cap = "Figure 4E: An example of physical interaction propagating the effects of genetic variation is plotted. On the left, genome scan showing LOD scores across the genome for proteins RPA1, RPA2 and RPA3 is shown with the location of Rpa3 gene annotated on the x- axis. On the right, the inferred founder allele effects at the pQTL peak for all three genes are shown.", warning=FALSE, message=FALSE, fig.height=4, fig.width=9}
+
+```{r Figure_4E_prep}
 
 rpa_qtl <- peaks.esc.overlap2 %>% 
   filter( lod.esc_prot >7.5, mgi_symbol %in% c("Rpa1","Rpa2","Rpa3"), match%in% c("esc_prot","shared"))
 
 # Effects plot
 # "A/J", "B6", "129", "NOD", "NZO", "CAST", "PWK", "WSB"
-peaks.esc.overlap.wEffs %>% 
+rpa_effects <- peaks.esc.overlap.wEffs %>% 
   filter( protein_id %in% rpa_qtl$protein_id , 
           peak_chr %in% rpa_qtl$peak_chr, 
           match%in% c("esc_prot","shared")) %>% 
   select( mgi_symbol, 
           paste0(LETTERS[1:8], ".esc_prot")
-  ) -> rpa_effects
+  ) 
 
-rpa_effects %>% 
-  column_to_rownames("mgi_symbol") %>%  t() -> rpa_effects_mat
+rpa_effects_mat <- rpa_effects %>% 
+  column_to_rownames("mgi_symbol") %>%  
+  t()
 
-rpa_effects %>% 
+Figure_4E_data_effs <- rpa_effects %>% 
   mutate( Protein= toupper(mgi_symbol)) %>% 
   pivot_longer( cols = c(paste0(LETTERS[1:8], ".esc_prot")), 
                 names_to = c("effect"),
@@ -1063,9 +1084,34 @@ rpa_effects %>%
                               Strain == "E" ~ "NZO",
                               Strain == "F" ~ "CAST",
                               Strain == "G" ~ "PWK",
-                              Strain == "H" ~ "WSB")) -> rpa_effects_plot_data
+                              Strain == "H" ~ "WSB")) 
 
-rpa_effects_plot_data %>% 
+# LOD plots
+rpa_pqtl <- scan1(genoprobs = probs.esc_prot,
+                      pheno = exprZ.esc_prot[,rpa_qtl$protein_id],
+                      kinship = kinship_loco.esc_prot,
+                      addcovar = covar.esc_prot)
+
+
+Figure_4E_data_scans <- rpa_pqtl %>% 
+  as_tibble(rownames = "marker") %>% 
+  left_join(map_dat2)  %>% 
+  filter( chr == rpa_qtl$peak_chr[1]) %>% 
+  pivot_longer( cols = c("ENSMUSP00000012627","ENSMUSP00000099621","ENSMUSP00000000767"), names_to = "protein_id", values_to = "lod") %>% 
+  left_join( select(all.prots, protein_id, mgi_symbol)) %>% 
+  mutate( Protein= toupper(mgi_symbol)) %>% 
+  mutate( Protein = factor( Protein, levels = c("RPA1","RPA2","RPA3"))) %>% 
+  select( Protein, 
+          `LOD score` = lod, 
+          `Marker Position (bp)` = pos_bp)
+
+```
+
+```{r Figure_4E_plot, fig.cap = "Figure 4E: An example of physical interaction propagating the effects of genetic variation is plotted. On the left, genome scan showing LOD scores across the genome for proteins RPA1, RPA2 and RPA3 is shown with the location of Rpa3 gene annotated on the x- axis. On the right, the inferred founder allele effects at the pQTL peak for all three genes are shown.", warning=FALSE, message=FALSE, fig.height=4, fig.width=9}
+
+
+
+Figure_4E_data_effs %>% 
   ggplot()+
   aes( x = Strain,
        y = `pQTL effect`, 
@@ -1088,24 +1134,7 @@ rpa_effects_plot_data %>%
   theme(legend.position = "none") -> rpa_haplotype_plot
 
 
-# LOD plots
-rpa_pqtl <- scan1(genoprobs = probs.esc_prot,
-                      pheno = exprZ.esc_prot[,rpa_qtl$protein_id],
-                      kinship = kinship_loco.esc_prot,
-                      addcovar = covar.esc_prot)
-
-
-rpa_pqtl %>% 
-  as_tibble(rownames = "marker") %>% 
-  left_join(map_dat2)  %>% 
-  filter( chr == rpa_qtl$peak_chr[1]) %>% 
-  pivot_longer( cols = c("ENSMUSP00000012627","ENSMUSP00000099621","ENSMUSP00000000767"), names_to = "protein_id", values_to = "lod") %>% 
-  left_join( select(all.prots, protein_id, mgi_symbol)) %>% 
-  mutate( Protein= toupper(mgi_symbol)) %>% 
-  mutate( Protein = factor( Protein, levels = c("RPA1","RPA2","RPA3"))) %>% 
-  rename( `LOD score` = lod, `Marker Position (bp)` = pos_bp) -> rpa_pqtl_scans
-
-rpa_pqtl_scans %>% 
+Figure_4E_data_scans %>% 
   ggplot()+
     aes( 
       x= `Marker Position (bp)`,
@@ -1117,11 +1146,11 @@ rpa_pqtl_scans %>%
   scale_color_manual( values = c( RColorBrewer::brewer.pal(6, "Blues")[3],
                                   RColorBrewer::brewer.pal(6, "Blues")[6],
                                   RColorBrewer::brewer.pal(6, "Blues")[4]))+
-  xlab(paste0("Chr ",rpa_qtl$peak_chr[1]," location (bp)"))+
+  xlab(paste0("Chr 6 location (bp)"))+
   ylab( "LOD score")+
   labs(col = "Protein")+
-  geom_segment( x = rpa_qtl$gene_start[1], xend = rpa_qtl$gene_end[1] , y = 0, yend = 1, col = "black", size = 2) +
-  annotate( "text", x= rpa_qtl$midpoint[1], y = 2, label ="italic(Rpa3)", parse = TRUE, size =6) +
+  geom_segment( x = 8255936, xend =  8259173, y = 0, yend = 1, col = "black", size = 2) +
+  annotate( "text", x= 8257554, y = 2, label ="italic(Rpa3)", parse = TRUE, size =6) +
   ylim(0,20) -> rpa_lod_plot
 
 
