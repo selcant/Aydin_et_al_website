@@ -19,7 +19,7 @@ p.caption {
 </style>
 ```
 
-```{r load_packages, warning=FALSE, message=FALSE, echo =FALSE}
+```{r load_packages, warning=FALSE, message=FALSE, echo = TRUE}
 # options
 options(stringsAsFactors = F)
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
@@ -734,11 +734,21 @@ xfun::embed_file(here("Table_S1.xlsx"))
 
 ```
 
-<br> <br>
+<br>
+
+```{r Protein_annotations, fig.cap = "Annotations for all proteins in our data set."}
+
+all.prots %>% 
+  create_dt()
+
+```
+
+<br> 
+<br>
 
 ### Figure 1B: Detection bias in proteomics
 
-```{r Figure1B, fig.height=3, fig.width=4, fig.cap="Figure 1B: Protein detection rate is linked to transcript abundance. The probability of a gene to have protein abundance measurement given its average transcript abundance among 174 mESCs with both transcriptome and proteome data."}
+```{r Figure1B, fig.height=4, fig.width=5, fig.cap="Figure 1B: Protein detection rate is linked to transcript abundance. The probability of a gene to have protein abundance measurement given its average transcript abundance among 174 mESCs with both transcriptome and proteome data."}
 
 # get the list of protein coding genes with transcript abundance in DO mESCs
 all.prot_coding.genes <-  all.genes %>% 
@@ -785,9 +795,11 @@ get_props <- function(dat) {
   return(prop.table)
 }
 
-prob_plot <- get_props(prop.data) %>% 
+Figure1b_data <- get_props(prop.data) %>% 
   rename( `Probability of protein detection` = detection_probability,
-          `Average transcript abundance` = avg_rna) %>% 
+          `Average transcript abundance` = avg_rna)
+
+prob_plot <- Figure1b_data %>% 
   ggplot() +
   aes(x = `Average transcript abundance`, 
       y = `Probability of protein detection`) +
@@ -813,9 +825,7 @@ ggarrange(prob_plot,
 
 ```{r Figure1B_data, fig.cap="Data used in Figure 1B."}
 
-get_props(prop.data) %>% 
-  rename( `Probability of protein detection` = detection_probability,
-          `Average transcript abundance` = avg_rna) %>% 
+Figure1b_data %>% 
   mutate_if( is.numeric, round ,2) %>% 
   create_dt()
 
@@ -995,14 +1005,16 @@ pca.prot <- pca(object = expr.esc_prot,
                             )
 
 # get values for Principal components
-scores(pca.prot) %>%
+Figure1c_data <- scores(pca.prot) %>%
   as_tibble( rownames ="sampleid") %>% 
   left_join(covarTidy.esc_prot) %>%
   mutate(sex = ifelse(sex == "F", "Female", "Male")) %>%
   rename(
     `Sample ID` = sampleid, 
     Sex = sex
-  ) %>% 
+  ) 
+
+Figure1c_data %>% 
   ggplot() +
   aes(x = PC1, y = PC2, col = Sex) +
   geom_point(size = 4, alpha = 0.7) +
@@ -1036,16 +1048,9 @@ ggarrange(pca_plot,
 
 ```{r Figure1C_data, fig.cap="Data used in plotting Figure 1C."}
 
-scores(pca.prot) %>%
-  as_tibble( rownames = "sampleid") %>% 
-  left_join(covarTidy.esc_prot) %>%
-  mutate(sex = ifelse(sex == "F", "Female", "Male")) %>% 
-  select(sampleid, sex, PC1, PC2) %>% 
-  mutate_if(is.numeric, round ,2) %>% 
-  rename(
-    `Sample ID` = sampleid, 
-    Sex = sex
-  ) %>% 
+Figure1c_data %>% 
+  select(`Sample ID`, Sex, PC1, PC2) %>% 
+  mutate_if(is.numeric, round ,2)  %>% 
   create_dt()
 
 ```
@@ -1213,7 +1218,8 @@ prot_sex_tukeys %>%
 
 ```
 
-<br> <br>
+<br> 
+<br>
 
 ### Figure 1D: Geneset variation analysis of the pluripotent proteome
 
@@ -1371,15 +1377,39 @@ gsva_rna_tukey %>%
 
 ```{r Figure1D, fig.width=16, fig.height=4, fig.cap="Figure 1D: Enrichment scores obtained from GSVA for Gene Ontology Biological Processes (GO:BP) showing significant differences between mESCs with different sexes and genotypes at the Lifr locus are plotted. GO:BP DNA methylation, chromatin remodeling and ribosome biogenesis show significantly higher enrichment in males in comparison to females and, protein ADP-ribosylation shows significantly higher enrichment in mESCs with at least one copy of the reference allele in comparison to ones carrying two copies of the alternative allele at the *Lifr* locus (two-way anova followed by Tukey’s HSD, `*: p value < 0.05, ****: p value < 0.00005`)."}
 
-gsva_results %>%
-  filter( Category ==  "GO:0006306") %>%
+Figure1d_data <- gsva_results %>%
+  filter( Category %in% c("GO:0006306", # DNA methylation
+                          "GO:0006338", # Chromatin remodeling
+                          "GO:0042254" # Ribosome biogenesis
+                          )) %>%
   left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
-  rename( `GO ID` = Category, 
+  select( Category, TERM, sampleid, Enrichment_Score, sex, lifr_geno) %>% 
+  left_join(
+    signif_results_tukey %>% 
+      filter( term =="sex") %>% 
+      select(Category, p.adj, p.adj.signif )
+  ) %>% 
+  rbind(
+       gsva_results %>%  
+         filter( Category == "GO:0006471") %>%  # protein ADP-ribosylation
+         left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
+         select( Category, TERM, sampleid, Enrichment_Score, sex, lifr_geno) %>% 
+         left_join(
+           signif_results_tukey %>% 
+             filter( term =="lifr_geno") %>% 
+             select(Category, p.adj, p.adj.signif )
+           )
+       ) %>% 
+  mutate( Enrichment_Score = round(Enrichment_Score, 2)) %>% 
+  select( `GO ID` = Category, 
           `GO Term`=TERM, 
           Sample = sampleid, 
           `Enrichment Score`=Enrichment_Score, 
           Sex = sex, 
-          `Lifr genotype`=lifr_geno) %>% 
+          `Lifr genotype`=lifr_geno, 
+          `Significance`=p.adj.signif)
+
+Figure1d_data %>% 
   ggplot()+
   aes( x = Sex,
        y = `Enrichment Score`,
@@ -1401,15 +1431,7 @@ gsva_results %>%
         axis.title = element_text(size =18),
         plot.title = element_text(size =18, hjust = 0.5)) -> p_met
 
-gsva_results %>%
-  filter( Category ==  "GO:0006338") %>%
-  left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
-  rename( `GO ID` = Category, 
-          `GO Term`=TERM, 
-          Sample = sampleid, 
-          `Enrichment Score`=Enrichment_Score, 
-          Sex = sex, 
-          `Lifr genotype`=lifr_geno) %>% 
+Figure1d_data %>% 
   ggplot()+
   aes( x = Sex,
        y = `Enrichment Score`,
@@ -1431,15 +1453,7 @@ gsva_results %>%
         axis.title = element_text(size =18),
         plot.title = element_text(size =18, hjust = .5)) -> p_chrom
 
-gsva_results %>%
-  filter( Category ==  "GO:0042254") %>%
-  left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
-  rename( `GO ID` = Category, 
-          `GO Term`=TERM, 
-          Sample = sampleid, 
-          `Enrichment Score`=Enrichment_Score, 
-          Sex = sex, 
-          `Lifr genotype`=lifr_geno) %>% 
+Figure1d_data %>% 
   ggplot()+
   aes( x = Sex,
        y = `Enrichment Score`,
@@ -1512,37 +1526,7 @@ ggarrange(left, p_adp,
 
 ```{r Figure1D_data, fig.cap="Data used to generate Figure 1D."}
 
-gsva_results %>%
-  filter( Category %in% c("GO:0006306", # DNA methylation
-                          "GO:0006338", # Chromatin remodeling
-                          "GO:0042254" # Ribosome biogenesis
-                          )) %>%
-  left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
-  select( Category, TERM, sampleid, Enrichment_Score, sex, lifr_geno) %>% 
-  left_join(
-    signif_results_tukey %>% 
-      filter( term =="sex") %>% 
-      select(Category, p.adj, p.adj.signif )
-  ) %>% 
-  rbind(
-       gsva_results %>%  
-         filter( Category == "GO:0006471") %>%  # protein ADP-ribosylation
-         left_join( select(goannot_wdef, Category = GOID, TERM)) %>% 
-         select( Category, TERM, sampleid, Enrichment_Score, sex, lifr_geno) %>% 
-         left_join(
-           signif_results_tukey %>% 
-             filter( term =="lifr_geno") %>% 
-             select(Category, p.adj, p.adj.signif )
-           )
-       ) %>% 
-  mutate( Enrichment_Score = round(Enrichment_Score, 2)) %>% 
-  select( `GO ID` = Category, 
-          `GO Term`=TERM, 
-          Sample = sampleid, 
-          `Enrichment Score`=Enrichment_Score, 
-          Sex = sex, 
-          `Lifr genotype`=lifr_geno, 
-          `Significance`=p.adj.signif) %>% 
+Figure1d_data %>% 
   create_dt()
 
 ```
