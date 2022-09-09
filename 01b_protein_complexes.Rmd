@@ -206,20 +206,25 @@ complexes_annotated <- mean_complex_prot %>%
                      n_complex,
                      n_mean)) 
 
+Figure2_data <- complex_genes_annotated %>% 
+  left_join( select(complexes_annotated, `Complex Name`, complex_type)) %>% 
+  distinct() %>% 
+  mutate( mgi_symbol = toupper(mgi_symbol)) %>% 
+  select( `Complex Name`, 
+          `Complex Cohesivenes` = cor_complex_prot, 
+          `Protein` = mgi_symbol,
+          `Average pairwise correlation` = cor_gene_prot) %>% 
+  distinct()
+
 ```
 
 
 
 ```{r Figure2, fig.height=5, fig.width=15, fig.cap="Figure 2: For each complex, pairwise Pearson correlations were calculated between all protein subunits and summarized as a boxplot. Boxplots are ordered and colored based on their median pairwise correlation, with more cohesive complexes on the left. Specific examples of the stable (most cohesive 10%) and variable (least cohesive 10%) complexes are highlighted"}
 
-complex_genes_annotated %>% 
-  left_join( select(complexes_annotated, `Complex Name`, complex_type)) %>% 
-  select( `Complex Name`, cor_complex_prot, cor_gene_prot) %>% 
-  distinct() %>% 
-  arrange( desc(cor_complex_prot) ) %>% 
+Figure2_data %>% 
+  arrange( desc(`Complex Cohesivenes`) ) %>% 
   mutate( label = factor(`Complex Name`, levels = unique(`Complex Name`))) %>% 
-  rename( `Complex Cohesivenes` = cor_complex_prot, 
-          `Average pairwise correlation` = cor_gene_prot) %>% 
   ggboxplot(
     x = "label",
     y = "Average pairwise correlation",
@@ -247,15 +252,7 @@ complex_genes_annotated %>%
 
 ```{r Figure2_data, fig.cap="Data used to generate Figure 2."}
 
-complex_genes_annotated %>% 
-  left_join( select(complexes_annotated, `Complex Name`, complex_type)) %>% 
-  distinct() %>% 
-  mutate( mgi_symbol = toupper(mgi_symbol)) %>% 
-  select( `Complex Name`, 
-          `Complex Cohesivenes` = cor_complex_prot, 
-          `Protein` = mgi_symbol,
-          `Average pairwise correlation` = cor_gene_prot) %>% 
-  distinct() %>% 
+ Figure2_data %>% 
   mutate_if( is.numeric, round ,2 ) %>% 
   create_dt()
   
