@@ -1162,9 +1162,9 @@ ids <- threeway.shared.samples$sampleid
 names(ids) <- threeway.shared.samples$top_muga
 threeway.shared.probs <- merged.probs[ind = threeway.shared.samples$top_muga]
 threeway.shared.probs <- replace_ids(threeway.shared.probs, ids)
-shared.kinship <- calc_kinship(threeway.shared.probs, type = "loco")
-shared.covar <- merged.covar[threeway.shared.samples$top_muga, , drop = FALSE]
-rownames(shared.covar) <- threeway.shared.samples$sampleid
+threeway.shared.kinship <- calc_kinship(threeway.shared.probs, type = "loco")
+threeway.shared.covar <- merged.covar[threeway.shared.samples$top_muga, , drop = FALSE]
+rownames(threeway.shared.covar ) <- threeway.shared.samples$sampleid
 
 # # adding shared data matrices with new_symbol in the column names
 shared.atac.data <- (counts.normZ[threeway.shared.samples$ATAC, threeway.shared.genes$peak_id])
@@ -1290,8 +1290,8 @@ for (i in 1:length((significant_pQTL_annot2$qtl_id))) {
     effs_rna <- scan1blup(
       genoprobs = probs_2marker,
       pheno = (shared.rna.data[, id, drop = FALSE]),
-      kinship = shared.kinship[[this_chrom]], 
-      addcovar = shared.covar
+      kinship = threeway.shared.kinship[[this_chrom]], 
+      addcovar = threeway.shared.covar 
     )
     significant_pQTL_annot2[i, paste0(LETTERS[1:8], ".esc_rna") ] <- as.list(colMeans(effs_rna)[LETTERS[1:8]])
     
@@ -1305,8 +1305,8 @@ for (i in 1:length((significant_pQTL_annot2$qtl_id))) {
     effs_atac <- scan1blup(
       genoprobs = probs_2marker,
       pheno = (shared.atac.data[, id, drop = FALSE]),
-      kinship = shared.kinship[[this_chrom]], 
-      addcovar = shared.covar
+      kinship = threeway.shared.kinship[[this_chrom]], 
+      addcovar = threeway.shared.covar 
     )
     significant_pQTL_annot2[i, paste0(LETTERS[1:8], ".esc_atac") ] <- as.list(colMeans(effs_atac)[LETTERS[1:8]])
   }
@@ -1319,7 +1319,7 @@ for (i in 1:length((significant_pQTL_annot2$qtl_id))) {
   #   effs_prot <- scan1blup(
   #     genoprobs = probs_2marker,
   #     pheno = (shared.prot.data[, id, drop = FALSE]),
-  #     kinship = shared.kinship[[this_chrom]], addcovar = shared.covar
+  #     kinship = threeway.shared.kinship[[this_chrom]], addcovar = threeway.shared.covar 
   #   )
   #   significant_pQTL_annot2[i, paste0(LETTERS[1:8], ".esc_prot") ] <- as.list(colMeans(effs_prot)[LETTERS[1:8]])
   # }
