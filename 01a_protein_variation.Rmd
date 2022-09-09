@@ -647,6 +647,7 @@ shared.probs <- merged.probs[ind = threeway.shared.samples$top_muga]
 attributes(shared.probs)$is_x_chr <-  attributes(probs.esc_atac)$is_x_chr
 shared.covar <- merged.covar[ threeway.shared.samples$top_muga,,drop=FALSE]
 shared.kinship <- calc_kinship(shared.probs, type = "loco")
+
 # prep some stuff for plotting:
 uchr <- c(as.character(1:19), "X")
 cl <- dplyr::select(map_dat2, chr, pos_bp) %>%
