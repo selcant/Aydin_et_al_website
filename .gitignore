@@ -13,6 +13,11 @@ _site/
 *_files/
 *_cache/
 *.html
-
+*.png
+*.xlsx
+*.RData
+*.zip
+rsconnect/
+site_libs/
 
 
