@@ -386,7 +386,7 @@ xfun::embed_file(here("Table_S7.xlsx"))
 
 <br>
 
-#### Figure S5A
+#### Figure S5A: Drivers of MOFA factors.
 
 ```{r Figure_S5A, fig.height=7, fig.width=5, warning=FALSE, message=FALSE, fig.cap = "Figure S5. Heatmaps showing the number of features in each data set with abs(weight) > 0.01 for 23 MOFA Factors."}
 
@@ -425,7 +425,7 @@ all_df_shared_weights %>%
 
 ### Figure 5B: QTL mapping with MOFA Factors
 
-```{r Figure5b, fig.cap = "Figure 5B:", warning=FALSE, message=FALSE, out.width="300px"}
+```{r Figure5b, fig.cap = "Figure 5B: Above shows a depiction of QTL mapping with MOFA factors to identify the genetic modifiers driving variation across three molecular layers. Below is a table of QTL peaks that map above the genome-wide significance threshold calculated individually for each factor. Loci that were previously observed as molecular QTL hotspots are denoted in the “Type” column. ", warning=FALSE, message=FALSE, out.width="450px"}
 
 # load from file
 knitr::include_graphics(here("Figure5B.png"))
@@ -435,7 +435,7 @@ knitr::include_graphics(here("Figure5B.png"))
 
 <br>
 
-```{r data_for_figure5B}
+```{r data_for_figure5B, fig.cap = "Data shown in Figure 5B."}
 
 # rankZ transform before mapping
 all_df_shared_factors_mat_rankZ <- apply( all_df_shared_factors_mat, 2, rankZ)

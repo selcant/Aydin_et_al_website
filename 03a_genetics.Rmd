@@ -949,7 +949,7 @@ xfun::embed_file(here("Table_S6.xlsx"))
 
 <br>
 
-#### Figure S4A-B
+#### Figure S4A-B: Details of the pQTL hotspot on chromosome 15
 
 ```{r Figure_S4A, fig.cap="Figure S4A: The allelic split observed in previously described eQTL hotspot on chromosome 15 is also observed for the pQTL hotspot. Heatmap showing haplotype effects at suggestive distant pQTL peaks (LOD > 6) within the chromosome 15 hotspot.", warning=FALSE, message=FALSE, fig.height=5, fig.width=8}
 
@@ -1064,7 +1064,7 @@ Figure_S4B
 
 <br>
 
-#### Figure S4C
+#### Figure S4C: QTL mapping with GSVA scores
 
 
 ```{r Figure_S4C, fig.height=4, fig.width=9,  warning=FALSE, message=FALSE, fig.cap="Figure S4C: Genetic mapping with GSVA scores of GO term Protein ADP-Ribosylation identifies a near significant QTL on chromosome 15 with similar haplotype effects to the chromosome 15 molecular QTL hotspot. On the left, genome scan showing LOD scores is plotted for chromosome 15. On the right, inferred haplotype effects at the QTL peak is plotted."}
