@@ -1166,7 +1166,7 @@ Figure_4E
 ```{r Figure4E_data_qtl_scans, fig.cap="QTL scans used in plotting LOD plots in Figure 4E."}
 
 
-rpa_pqtl_scans %>% 
+Figure_4E_data_scans %>% 
   select( Protein, 
           `LOD score` , 
           `Marker Position (bp)`) %>% 
@@ -1180,7 +1180,7 @@ rpa_pqtl_scans %>%
 
 ```{r Figure4E_data_effects, fig.cap="Haplotype effects plotted in Figure 4E."}
 
-rpa_effects_plot_data %>% 
+Figure_4E_data_effs %>% 
   select( Protein,
           Strain,
           `pQTL effect`) %>% 
@@ -1271,8 +1271,6 @@ significant_pQTL %>%
                      "shared, shared_caQTL_eQTL",
                      "shared_caQTL_eQTL, shared",
                      "shared"
-		
-
                      )~"shared ca/e/pQTL"
   )) -> significant_pQTL_annot 
 
