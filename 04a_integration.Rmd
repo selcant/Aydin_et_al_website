@@ -190,7 +190,183 @@ get_tf_ora <- function( factor_df, factor_num, bg_peaks){
 load( here("../pQTL_website/_data/","MOFA_Factor_LOLA_results.RData")) # lola_combined
 
 ```
+<br>
 
+```{r Figure_5A_prep}
+
+Figure5A_data_var_exp <- all_df_shared_var_explained$r2_per_factor$single_group %>%
+  as_tibble(rownames = "Factor") %>%
+  mutate(factor_num = as.numeric(gsub( "Factor" ,"",Factor)) )%>%
+  arrange((factor_num)) %>%
+  pivot_longer(c("Chromatin","Protein","Transcript")) %>%
+  mutate( Factor = factor(Factor, levels = unique(Factor))) %>%
+  mutate( name = factor( name, levels = c("Chromatin","Transcript","Protein"))) %>%
+  select( `Data set` = name, Factor, `% Variation Explained` = value)
+
+Figure5A_data_cor_to_covar <- all_df_shared_corr_covar %>%
+  mutate( Factor = factor(Factor, levels = unique(Factor))) %>%
+  mutate( covariate = ifelse( covariate =="sex", "Sex", "LIFR genotype")) %>%
+  mutate( covariate = factor( covariate, levels = c("Sex", "LIFR genotype"))) %>%
+  select(Factor, covariate, Correlation =pearson_r)
+
+Figure5A_data_tf_ora <- lola_combined %>% 
+  filter( antibody %in% c("Nanog","Sox2","Pou5f1")) %>% 
+  filter( description %in% c("ES cells expressing control shRNA targeting GFP",
+                             "V6.5 (C57BL/6-129) murine ES cells were grown under typical ES conditions on irr",
+                             "N/A")) %>% 
+  filter( !description %in% c("ES cells expressing shRNA targeting Kdm4b",
+                             "ES cells expressing shRNA targeting Kdm4c",
+                             "ES cells cultured in FGF4; heparin and Activin A for 1 day after Oct3/4 deleted",
+                             "ES cells differentiated in vitro for 2 days; Brn2 expression induced using Tet-O",
+                             "ES cells cultured in FGF4; heparin and Activin A for 2 days after Oct3/4 deleted",
+                             "ES cells cultured in FGF4; heparin and Activin A for 3 days after Oct3/4 deleted",
+                             "ES cells differentiated in vitro for 2 days")) %>% 
+  full_join( tibble(
+                factor = c( paste0("Factor ", seq(1:23))),
+                factor_num = seq(1:23)) 
+              ) %>% 
+  group_by(factor, antibody, factor_num) %>% 
+  dplyr::summarize( mean_odds = mean(oddsRatio, na.rm= T)) %>% 
+  ungroup() %>% 
+  arrange(factor_num) %>% 
+  mutate( Factor = factor(factor, levels = unique(factor))) %>%
+  select(Factor, TF = antibody, `Odds ratio` = mean_odds)
+  
+  
+```
+
+```{r Figure5A, fig.cap = "MOFA yielded 23 latent factors that capture variation in one or more layers of genomic data. For each factor, percent of variation explained in chromatin accessibility, transcript abundance, and protein abundance is displayed as a heatmap, as is the correlation of each factor to experimental covariates including sex and genotype at the Lifr locus. Heatmap on the right indicates overrepresentation of pluripotency regulator binding sites (NANOG, OCT4 (Pou5f1) and SOX2) among the top chromatin drivers of each factor.", fig.width=16, fig.height=8}
+
+
+# % variation explained heatmap.
+Figure5A_data_var_exp %>% 
+  ggplot()+
+  aes( 
+       y = Factor,
+       x = `Data set`,
+       fill = `% Variation Explained`)+
+  geom_tile()+
+  xlab("")+
+  ylab("")+
+  theme_pubclean( base_size = 18)+
+  scale_fill_gradient2( limits = c(0, 10))+
+  #scale_size_area()+
+  labs(fill = "% Variation Explained", col = "")+
+  scale_x_discrete( expand = expansion(mult = 0))+
+  theme(
+        legend.position = "top", 
+        legend.title = element_text(size = 18, vjust = 0.9),
+        legend.text  = element_text(angle=45, size =12, vjust = 0.5),
+        )-> all_df_shared_var_plot
+
+# correlation to covariates.
+Figure5A_data_cor_to_covar %>%
+  filter(covariate == "Sex") %>% 
+  ggplot()+
+  aes(
+    x = covariate,
+    y = Factor,
+    fill = Correlation
+  )+
+  geom_tile()+
+  xlab("")+
+  ylab("")+
+  theme_pubclean(base_size = 18)+
+  scale_fill_gradient(low = "white",high = "dark red", limits = c(0,1))+
+  theme(legend.position = "top",
+        axis.ticks.y = element_blank(),
+        legend.text  = element_text(angle=45, size =12, vjust = 0.5),
+        legend.title = element_text(size = 18, vjust = 0.9),
+        )+
+  scale_y_discrete( labels = NULL)+
+  scale_x_discrete( expand = expansion(mult = 0))+
+  labs( fill = "Correlation") -> all_df_shared_covar_plot_sex
+
+Figure5A_data_cor_to_covar %>%
+  filter(covariate != "Sex") %>% 
+  ggplot()+
+  aes(
+    x = covariate,
+    y = Factor,
+    fill = Correlation
+  )+
+  geom_tile()+
+  xlab("")+
+  ylab("")+
+  theme_pubclean(base_size = 18)+
+  scale_fill_gradient(low = "white",high = "deeppink4", limits = c(0,1))+
+  theme(legend.position = "top",
+        axis.ticks.y = element_blank(),
+        legend.text  = element_text(angle=45, size =12, vjust = 0.5),
+        legend.title = element_text(size =12)
+        )+
+  scale_y_discrete( labels = NULL)+
+  scale_x_discrete( expand = expansion(mult = 0))+
+  labs( fill = "") -> all_df_shared_covar_plot_lifr
+
+# Odds ratio for TF binding overrepresentation for NANOG, OCT4, SOX2 in ATACseq peak drivers
+Figure5A_data_tf_ora %>% 
+  mutate( mean_odds_capped = ifelse( `Odds ratio` >10, 10, `Odds ratio`)) %>% 
+  ggplot()+
+  aes(
+    x = TF,
+    y = Factor,
+    fill = mean_odds_capped
+  )+
+  geom_tile()+
+  xlab("")+
+  ylab("")+
+  theme_pubclean(base_size = 18)+
+  scale_fill_gradient(low = "light gray",high = "#ffa08aff", limits = c(0,10)) +
+  theme(legend.position = "top",
+        legend.text  = element_text(angle=45, size =12, vjust = 0.5),
+        legend.title = element_text(size = 18, vjust = 0.9),
+        axis.text.x =  element_text(angle = 0),
+         axis.ticks.y = element_blank(),
+        )+
+  scale_y_discrete( labels = NULL)+
+  scale_x_discrete( expand = expansion(mult = 0))+
+  labs( fill = "Odds ratio") -> lola_sum_figure
+
+figure5a <- ggarrange( all_df_shared_var_plot,
+                       all_df_shared_covar_plot_sex,
+                       all_df_shared_covar_plot_lifr,
+                       lola_sum_figure,
+                       widths = c(0.45,0.15,0.15,0.2), nrow = 1,
+                       labels = "A",
+                       font.label = list( size = 28))
+
+
+figure5a
+
+```
+
+<br>
+
+```{r Figure_5A_data_variation_explained}
+
+Figure5A_data_var_exp %>% 
+  create_dt()
+
+```
+
+<br>
+
+```{r Figure_5A_data_correlation_to_covariates}
+
+Figure5A_data_cor_to_covar %>% 
+  create_dt()
+
+```
+
+<br>
+
+```{r Figure_5A_data_tf_overrepresentation}
+
+Figure5A_data_tf_ora %>% 
+  create_dt()
+
+```
 
 <br>
 
@@ -240,156 +416,6 @@ all_df_shared_weights %>%
 
 ```
 
-
-<br>
-<br>
-
-### Figure 5A: Overview of MOFA Factors
-
-```{r Figure5A, fig.cap = " MOFA yielded 23 latent factors that capture variation in one or more layers of genomic data. For each factor, percent of variation explained in chromatin accessibility, transcript abundance, and protein abundance is displayed as a heatmap, as is the correlation of each factor to experimental covariates including sex and genotype at the Lifr locus. Heatmap on the right indicates overrepresentation of pluripotency regulator binding sites (NANOG, OCT4 (Pou5f1) and SOX2) among the top chromatin drivers of each factor.", fig.width=16, fig.height=8}
-
-
-# % variation explained heatmap.
-all_df_shared_var_explained$r2_per_factor$single_group %>%
-  as_tibble(rownames = "Factor") %>%
-  mutate(factor_num = as.numeric(gsub( "Factor" ,"",Factor)) )%>%
-  arrange((factor_num)) %>%
-  pivot_longer(c("Chromatin","Protein","Transcript")) %>%
-  mutate( Factor = factor(Factor, levels = unique(Factor))) %>%
-  mutate( name = factor( name, levels = c("Chromatin","Transcript","Protein"))) %>%
-  ggplot()+
-  aes( 
-       y = Factor,
-       x = name,
-       fill = value)+
-  geom_tile()+
-  xlab("")+
-  ylab("")+
-  theme_pubclean( base_size = 18)+
-  scale_fill_gradient2( limits = c(0, 10))+
-  #scale_size_area()+
-  labs(fill = "% Variation Explained", col = "")+
-  scale_x_discrete( expand = expansion(mult = 0))+
-  theme(
-        legend.position = "top", 
-        legend.title = element_text(size = 18, vjust = 0.9),
-        legend.text  = element_text(angle=45, size =12, vjust = 0.5),
-        )-> all_df_shared_var_plot
-
-# correlation to covariates.
-all_df_shared_corr_covar %>%
-  mutate( Factor = factor(Factor, levels = unique(Factor))) %>%
-  mutate( covariate = ifelse( covariate =="sex", "Sex", "LIFR genotype")) %>%
-  mutate( covariate = factor( covariate, levels = c("Sex", "LIFR genotype"))) %>%
-  filter(covariate == "Sex") %>% 
-  ggplot()+
-  aes(
-    x = covariate,
-    y = Factor,
-    fill = abs(pearson_r)
-  )+
-  geom_tile()+
-  xlab("")+
-  ylab("")+
-  theme_pubclean(base_size = 18)+
-  scale_fill_gradient(low = "white",high = "dark red", limits = c(0,1))+
-  theme(legend.position = "top",
-        axis.ticks.y = element_blank(),
-        legend.text  = element_text(angle=45, size =12, vjust = 0.5),
-        legend.title = element_text(size = 18, vjust = 0.9),
-        )+
-  scale_y_discrete( labels = NULL)+
-  scale_x_discrete( expand = expansion(mult = 0))+
-  labs( fill = "Correlation") -> all_df_shared_covar_plot_sex
-
-all_df_shared_corr_covar %>%
-  mutate( Factor = factor(Factor, levels = unique(Factor))) %>%
-  mutate( covariate = ifelse( covariate =="sex", "Sex", "Lifr genotype")) %>%
-  mutate( covariate = factor( covariate, levels = c("Sex", "Lifr genotype"))) %>%
-  filter(covariate != "Sex") %>% 
-  ggplot()+
-  aes(
-    x = covariate,
-    y = Factor,
-    fill = abs(pearson_r)
-  )+
-  geom_tile()+
-  xlab("")+
-  ylab("")+
-  theme_pubclean(base_size = 18)+
-  scale_fill_gradient(low = "white",high = "deeppink4", limits = c(0,1))+
-  theme(legend.position = "top",
-        axis.ticks.y = element_blank(),
-        legend.text  = element_text(angle=45, size =12, vjust = 0.5),
-        legend.title = element_text(size =12)
-        )+
-  scale_y_discrete( labels = NULL)+
-  scale_x_discrete( expand = expansion(mult = 0))+
-  labs( fill = "") -> all_df_shared_covar_plot_lifr
-
-# Odds ratio for TF binding overrepresentation for NANOG, OCT4, SOX2 in ATACseq peak drivers
-lola_combined %>% 
-  filter( antibody %in% c("Nanog","Sox2","Pou5f1")) %>% 
-  filter( description %in% c("ES cells expressing control shRNA targeting GFP",
-                             "V6.5 (C57BL/6-129) murine ES cells were grown under typical ES conditions on irr",
-                             "N/A")) %>% 
-  filter( !description %in% c("ES cells expressing shRNA targeting Kdm4b",
-                             "ES cells expressing shRNA targeting Kdm4c",
-                             "ES cells cultured in FGF4; heparin and Activin A for 1 day after Oct3/4 deleted",
-                             "ES cells differentiated in vitro for 2 days; Brn2 expression induced using Tet-O",
-                             "ES cells cultured in FGF4; heparin and Activin A for 2 days after Oct3/4 deleted",
-                             "ES cells cultured in FGF4; heparin and Activin A for 3 days after Oct3/4 deleted",
-                             "ES cells differentiated in vitro for 2 days")) %>% 
-  full_join( tibble(
-                factor = c( paste0("Factor ", seq(1:23))),
-                factor_num = seq(1:23)) 
-              ) %>% 
-  group_by(factor, antibody, factor_num) %>% 
-  dplyr::summarize( mean_odds = mean(oddsRatio, na.rm= T)) %>% 
-  ungroup() %>% 
-  mutate( mean_odds_capped = ifelse( mean_odds >10, 10, mean_odds)) %>% 
-  arrange(factor_num) %>% 
-  mutate( Factor = factor(factor, levels = unique(factor))) %>%
-  ggplot()+
-  aes(
-    x = antibody,
-    y = Factor,
-    fill = mean_odds_capped
-  )+
-  geom_tile()+
-  xlab("")+
-  ylab("")+
-  theme_pubclean(base_size = 18)+
-  scale_fill_gradient(low = "light gray",high = "#ffa08aff", limits = c(0,10)) +
-  theme(legend.position = "top",
-        legend.text  = element_text(angle=45, size =12, vjust = 0.5),
-        legend.title = element_text(size = 18, vjust = 0.9),
-        axis.text.x =  element_text(angle = 0),
-         axis.ticks.y = element_blank(),
-        )+
-  scale_y_discrete( labels = NULL)+
-  scale_x_discrete( expand = expansion(mult = 0))+
-  labs( fill = "Odds ratio") -> lola_sum_figure
-
-figure5a <- ggarrange( all_df_shared_var_plot,
-                       all_df_shared_covar_plot_sex,
-                       all_df_shared_covar_plot_lifr,
-                       lola_sum_figure,
-                       widths = c(0.45,0.15,0.15,0.2), nrow = 1,
-                       labels = "A",
-                       font.label = list( size = 28))
-
-
-figure5a
-
-```
-
-<br>
-
-```{r data_for_figure5a}
-
-
-```
 
 <br>
 <br>
