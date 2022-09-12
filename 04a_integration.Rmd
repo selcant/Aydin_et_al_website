@@ -244,7 +244,7 @@ all_df_shared_weights %>%
 <br>
 <br>
 
-### Figure 5A
+### Figure 5A: Overview of MOFA Factors
 
 ```{r Figure5A, fig.cap = " MOFA yielded 23 latent factors that capture variation in one or more layers of genomic data. For each factor, percent of variation explained in chromatin accessibility, transcript abundance, and protein abundance is displayed as a heatmap, as is the correlation of each factor to experimental covariates including sex and genotype at the Lifr locus. Heatmap on the right indicates overrepresentation of pluripotency regulator binding sites (NANOG, OCT4 (Pou5f1) and SOX2) among the top chromatin drivers of each factor.", fig.width=16, fig.height=8}
 
@@ -395,7 +395,7 @@ figure5a
 <br>
 
 
-### Figure 5B:
+### Figure 5B: QTL mapping with MOFA Factors
 
 ```{r Figure5b, fig.cap = "Figure 5B:", warning=FALSE, message=FALSE, out.width="300px"}
 
@@ -484,7 +484,7 @@ all_df_shared_peaks_sig %>%
 <br>
 <br>
 
-### Figure 5C:
+### Figure 5C: MOFA Factor 3 QTL on chromosome 15
 
 ```{r Figure5c_generate, cache = TRUE, fig.width=6, fig.height=5, fig.cap = "Figure 5C: For all expressed proteins, the pQTL LOD score calculated at the Chr 15 QTL peak is plotted on the y-axis relative to the protein’s contribution (factor weight) to MOFA Factor 3 on the x-axis. Proteins with absolute factor weights less than 0.1 were filtered. Correlation between allele effects at the Chr 15 pQTL for individual proteins to allele effects of the Factor 3 QTL. Individual genes that mapped with a significant QTL (LOD > 7.5) are colored gray, and highlight that many proteins contribute substantially to Factor 3 and show high agreement in allele effects at the Chr 15 QTL (dark red and blue), despite not mapping individually with a significant QTL at that locus."}
 
@@ -620,7 +620,7 @@ factor3_pqtl_effs_wcorr_weights %>%
 <br>
 <br>
 
-### Figure 5D:
+### Figure 5D: MOFA Factor 4 QTL on chromosome 10 
 
 
 ```{r Figure5d_generate, cache = TRUE, fig.width=6, fig.height=5, fig.cap = "Figure 5D: For all expressed transcripts, the eQTL LOD score at the Chr 10 QTL peak is plotted on the y-axis relative to that transcript’s contribution to Factor 4 on the x-axis. Again, transcripts with absolute factor weights less than 0.1 were filtered, and individual points are as described in panel C. Many transcripts contribute to Factor 4 and have correlated allele effects at the Chr 10 QTL, despite individually failing to map with a significant Chr 10 eQTL."}
@@ -761,7 +761,7 @@ factor4_eqtl_effs_wcorr_weights %>%
 
 
 
-### Figure 5E:
+### Figure 5E: Mediation of Factor 4 QTL on chromosome 10
 
 
 
