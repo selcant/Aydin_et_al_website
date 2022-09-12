@@ -30,7 +30,9 @@ knitr::opts_knit$set(progress = FALSE)
 <br>
 
 
-We feed log transformed values, using `log1p()` base R function, for accessibility at 15,000 regions in the genome with the most variance in chromatin accessibility, all transcripts and all proteins with abundance measurements into MOFA+ for model generation. Below you can find the .RData file containing the data frame with all the feature values per sample ready to be inputted to MOFA+.
+We feed log transformed values, using `log1p()` base R function, for accessibility at 15,000 regions in the genome with the most variance in chromatin accessibility, all transcripts and all proteins with abundance measurements into MOFA+ for model generation. 
+
+<!-- Below you can find the .RData file containing the data frame with all the feature values per sample ready to be inputted to MOFA+. -->
 
 ```{r MOFA_data, echo = FALSE}
 
@@ -46,7 +48,7 @@ rm(all_df,
 # MOFA_data <- all_df_shared
 # save(MOFA_data, file = here("MOFA_data.RData"))
 
-xfun::embed_file(here("MOFA_data.zip"))
+# xfun::embed_file(here("MOFA_data.zip"))
 
 
 ```
@@ -535,7 +537,7 @@ probs2_markers <- subset_probs( probs.esc_prot,
                                 this_chrom =mofa_peak_chr,
                                 this_markers = mofa_markers )
 
-for( i in 1:5){
+for( i in 1:nrow(all.prots)){
     probs2_markers <- subset_probs( probs.esc_prot,
                                     this_chrom = mofa_peak_chr,
                                     this_markers = mofa_markers )
@@ -677,7 +679,7 @@ probs2_markers <- subset_probs( probs.esc_rna,
                                 this_chrom =mofa_peak_chr, 
                                 this_markers = mofa_markers )
 
-for( i in 1:5){
+for( i in 1:nrow(all.genes)){
     probs2_markers <- subset_probs( probs.esc_rna, 
                                     this_chrom = mofa_peak_chr, 
                                     this_markers = mofa_markers )
@@ -961,7 +963,7 @@ Figure5E_data_mediation <- factor4_meds %>%
 ```
 
 
-```{r Figure5E, fig.width=12, fig.height=4, fig.cap ="Figure 5E:Genome-wide LOD scores obtained from the Factor 4 QTL scan is plotted with mediation results overlaid. Mediation with Gm20625 transcript abundance causes the largest decrease in QTL LOD score. Duxf3 expression was previously identified as a strong candidate mediator for the eQTL hotspot in this region (Skelly et al., 2020), but performs poorly as a mediator of the Factor 4 QTL compared to Gm20625. Both genes are highlighted in green next to their corresponding LOD score drop." }
+```{r Figure_5E_plot, fig.width=12, fig.height=4, fig.cap ="Figure 5E:Genome-wide LOD scores obtained from the Factor 4 QTL scan is plotted with mediation results overlaid. Mediation with Gm20625 transcript abundance causes the largest decrease in QTL LOD score. Duxf3 expression was previously identified as a strong candidate mediator for the eQTL hotspot in this region (Skelly et al., 2020), but performs poorly as a mediator of the Factor 4 QTL compared to Gm20625. Both genes are highlighted in green next to their corresponding LOD score drop." }
 
 
 
@@ -997,22 +999,22 @@ factor4_meds_duxf <- Figure5E_data_mediation %>%
 
 factor4_lod_plot+
   geom_point( data = Figure5E_data_mediation, 
-              aes( x = middle*1e06+chrom_lens_offset[10],
-                   y = LOD),
+              aes( x = `Mediator midpoint (Mbp)`*1e06+chrom_lens_offset[10],
+                   y = `Mediated LOD`),
               col = qtl.colors[["rna"]],
               size = 4,
               alpha = 0.9)+
   annotate( "label", 
-            y = factor4_meds_min$LOD+0.1, 
-            x =factor4_meds_min$middle*1e06+chrom_lens_offset[10]-1.9e08 ,
-            label = factor4_meds_min$mgi_symbol, 
+            y = factor4_meds_min$`Mediated LOD`+0.1, 
+            x = factor4_meds_min$`Mediator midpoint (Mbp)`*1e06+chrom_lens_offset[10]-1.9e08 ,
+            label = factor4_meds_min$`Mediator MGI symbol`, 
             size = 6, 
             col = qtl.colors[["rna"]],
             fontface = "italic")+
   annotate("label",
-           y = factor4_meds_duxf$LOD+0.1, 
-            x =factor4_meds_duxf$middle*1e06+chrom_lens_offset[10]-1.3e08 ,
-            label = factor4_meds_duxf$mgi_symbol, 
+           y = factor4_meds_duxf$`Mediated LOD`+0.1, 
+            x =factor4_meds_duxf$`Mediator midpoint (Mbp)`*1e06+chrom_lens_offset[10]-1.3e08 ,
+            label = factor4_meds_duxf$`Mediator MGI symbol`, 
             size = 6, 
             col = qtl.colors[["rna"]],
             fontface = "italic")+

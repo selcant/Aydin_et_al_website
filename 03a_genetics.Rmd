@@ -170,6 +170,130 @@ xfun::embed_file(here("Table_S5.xlsx"))
 ```
 
 <br>
+
+### Example pQTL mapping code
+
+For a single protein below is code for:
+
+-   rankZ normalization
+-   pQTL mapping
+-   Finding the pQTL peak
+-   Getting the allele effects at the pQTL peak
+
+Please click on 'code' button below to make the code chunk visible. 
+
+```{r pQTL_example_code, eval = TRUE, echo = TRUE}
+
+# select protein example ENSMUSP00000109687, Tcf7l1
+protein_example_id <- "ENSMUSP00000109687"
+
+# 1 - rankZ normalize
+rankZ <- function (x) {
+  x <- rank(x, na.last = "keep", ties.method = "average")/(sum(!is.na(x)) + 1)
+  qnorm(x)
+}
+protein_abundance <- expr.esc_prot[,"ENSMUSP00000109687", drop = FALSE]
+protein_abundance_rankZ <- apply( protein_abundance, 2, rankZ)
+
+# 2 - pQTL mapping
+pQTL_scan <- qtl2::scan1(genoprobs = probs.esc_prot, 
+                         pheno = protein_abundance_rankZ, 
+                         kinship = kinship_loco.esc_prot, 
+                         addcovar = covar.esc_prot
+                         )
+
+# 3 - get pQTL peak
+pQTL_peak <- find_peaks( scan1_output = pQTL_scan, 
+                         map = gmap, 
+                         threshold = 5)
+pQTL_peak_significant <- pQTL_peak %>% 
+  filter(lod >7.5)
+
+# 4 - get effects at the significant pQTL peak
+# First interpolate the peak location from cM to bp
+interp_bp <- function(df) {
+  
+  df <- arrange(df, peak_chr, peak_cM)
+  peak_gpos <- select(df, peak_chr, peak_cM)
+  chr <- peak_gpos$peak_chr
+  f <- factor(chr, chroms)
+  peak_gcoord_list <- split(peak_gpos$peak_cM, f)
+  peak_pcoord_list <- qtl2::interp_map(peak_gcoord_list, gmap, pmap)
+  df$interp_bp_peak <- unsplit(peak_pcoord_list, f)
+  df
+}
+pQTL_peak_significant <- pQTL_peak_significant %>% 
+  mutate( peak_chr = chr, peak_cM = pos) %>% 
+  interp_bp(.)
+# Then we need to get the bounding markers for the QTL peak
+# i.e. markers on the 69k grid that are up- and downstream of the peak
+query <- pQTL_peak_significant %>% 
+  dplyr::select(peak_chr, interp_bp_peak) %>%
+  dplyr::rename(chrom=peak_chr, start=interp_bp_peak) %>% 
+  mutate(end=start) %>%
+  GenomicRanges::GRanges()  
+subject <- select(map_dat2, chrom, pos_bp) %>% 
+  dplyr::rename(start=pos_bp) %>%
+  mutate(end=start) %>% 
+  GenomicRanges::GRanges()   # length 69,005
+pQTL_peak_significant$before <- map_dat2$marker[follow(query, subject)]
+pQTL_peak_significant$after <- map_dat2$marker[precede(query, subject)]
+# Now we can get the average allele effects between the two markers
+subset_probs <- function(this_probs, this_chrom, this_markers) {
+    att <- attributes(this_probs)
+    att$names <- this_chrom
+    att$is_x_chr <- setNames(FALSE, this_chrom)
+    #assert_that(all(this_markers %in% dimnames(this_probs[[this_chrom]])[[3]]))
+    newprobs <- list(this_probs[[this_chrom]][, , this_markers, drop=FALSE])
+    names(newprobs) <- this_chrom
+    attributes(newprobs) <- att
+    newprobs
+}
+probs_2marker <- subset_probs(probs.esc_prot, 
+                              pQTL_peak_significant$peak_chr, 
+                              c(pQTL_peak_significant$before, pQTL_peak_significant$after)
+                              )
+pQTL_effects <- scan1blup(genoprobs = probs_2marker, 
+                          pheno = protein_abundance_rankZ,
+                          kinship = kinship_loco.esc_prot[[pQTL_peak_significant$peak_chr]],
+                          addcovar = covar.esc_prot
+                          )
+pQTL_effects <- colMeans(pQTL_effects[, LETTERS[1:8]]) %>%
+  as_tibble()
+
+# add effects to the peaks & add annotations
+pQTL_peak_significant <- cbind(pQTL_peak_significant, t(as.matrix(pQTL_effects))) %>% 
+  rename( protein_id = lodcolumn) %>% 
+  left_join( all.prots) %>% 
+  select(-lodindex, -chr)
+
+
+# Print the results
+pQTL_peak_significant
+
+```
+
+<!-- <br> -->
+
+<!-- Below is a zipped RData file that contains all the necessary objects for the steps detailed above. -->
+
+<!-- -   exprZ.esc_prot: RankZ normalized protein abundance values. -->
+<!-- -   probs.esc_prot: Genotype probabilities across 190 DO mESCs. -->
+<!-- -   covar.esc_prot: Covariate matrix containing sexes for each sample. -->
+<!-- -   kinship_loco.esc_prot: Kinship matrix generated using genotype probabilities and `qtl2::calc_kinship()` function with `type = "loco"` option.  -->
+<!-- -   gmap, pmap, map_dat2: Genetic, physical and combined maps used in QTL mapping. -->
+<!-- -   all.prots: Table containing annotations for all proteins.  -->
+
+<!-- ```{r echo = FALSE} -->
+
+<!-- # save( exprZ.esc_prot, probs.esc_prot , covar.esc_prot, kinship_loco.esc_prot, gmap, pmap, map_dat2, all.prots, -->
+<!-- #         file = here("DO_mESC_pQTL_mapping_objects.RData")) -->
+
+<!-- xfun::embed_file(here("DO_mESC_pQTL_mapping_objects.zip")) -->
+
+<!-- ``` -->
+
+<br>
 <br>
 
 ### Figure 4B: Correlation of allele effects
