@@ -960,6 +960,7 @@ ora_neg_cor$result %>%
   rbind( mutate( ora_pos_cor$result, group = "Positive correlation")) %>%
   rbind( mutate( ora_no_cor$result , group = "No correlation")) -> ora_all_corr
 
+
 Figure3C_data_part1 <- prot_rna_gene_cor_df %>% 
   mutate( 
     Group = case_when(
@@ -997,6 +998,8 @@ Figure3C_data_part2 <- ora_all_corr %>%
                                ( abs(cor) > 0.05 & p_adj >= 0.05) ~ "none"
                               )
   )
+y_colors <- RColorBrewer::brewer.pal(n = 4, name = "Dark2")
+
 # For adding the labels next to dots in matching color
 Figure3C_data_part3 <- ora_all_corr %>%
   filter(term_name %in% c("cellular respiration", "mitochondrial ribosome",
