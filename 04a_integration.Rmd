@@ -268,7 +268,7 @@ Figure5A_data_cor_to_covar %>%
   aes(
     x = covariate,
     y = Factor,
-    fill = Correlation
+    fill = abs(Correlation)
   )+
   geom_tile()+
   xlab("")+
@@ -290,7 +290,7 @@ Figure5A_data_cor_to_covar %>%
   aes(
     x = covariate,
     y = Factor,
-    fill = Correlation
+    fill = abs(Correlation)
   )+
   geom_tile()+
   xlab("")+
