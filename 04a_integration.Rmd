@@ -235,7 +235,7 @@ Figure5A_data_tf_ora <- lola_combined %>%
   
 ```
 
-```{r Figure5A, fig.cap = "MOFA yielded 23 latent factors that capture variation in one or more layers of genomic data. For each factor, percent of variation explained in chromatin accessibility, transcript abundance, and protein abundance is displayed as a heatmap, as is the correlation of each factor to experimental covariates including sex and genotype at the Lifr locus. Heatmap on the right indicates overrepresentation of pluripotency regulator binding sites (NANOG, OCT4 (Pou5f1) and SOX2) among the top chromatin drivers of each factor.", fig.width=16, fig.height=8}
+```{r Figure_5A_plot, fig.cap = "MOFA yielded 23 latent factors that capture variation in one or more layers of genomic data. For each factor, percent of variation explained in chromatin accessibility, transcript abundance, and protein abundance is displayed as a heatmap, as is the correlation of each factor to experimental covariates including sex and genotype at the Lifr locus. Heatmap on the right indicates overrepresentation of pluripotency regulator binding sites (NANOG, OCT4 (Pou5f1) and SOX2) among the top chromatin drivers of each factor.", fig.width=16, fig.height=8}
 
 
 # % variation explained heatmap.
@@ -512,7 +512,7 @@ all_df_shared_peaks_sig %>%
 
 ### Figure 5C: MOFA Factor 3 QTL on chromosome 15
 
-```{r Figure5c_generate, cache = TRUE, fig.width=6, fig.height=5, fig.cap = "Figure 5C: For all expressed proteins, the pQTL LOD score calculated at the Chr 15 QTL peak is plotted on the y-axis relative to the protein’s contribution (factor weight) to MOFA Factor 3 on the x-axis. Proteins with absolute factor weights less than 0.1 were filtered. Correlation between allele effects at the Chr 15 pQTL for individual proteins to allele effects of the Factor 3 QTL. Individual genes that mapped with a significant QTL (LOD > 7.5) are colored gray, and highlight that many proteins contribute substantially to Factor 3 and show high agreement in allele effects at the Chr 15 QTL (dark red and blue), despite not mapping individually with a significant QTL at that locus."}
+```{r Figure_5C_prep, cache = TRUE}
 
 # get allele effects for MOFA Factor 3 on chr 15
 factor3_chr15_qtl <- all_df_shared_peaks_sig %>%
@@ -583,8 +583,8 @@ factor3_pqtl_lods <- apply( esc.prot.scans[c(factor3_chr15_qtl$before, factor3_c
   rename( pQTL_lod = value)
 rm(esc.prot.scans)
 
-# plot protein weight by pQTL LOD , colored by allele effect correlation
-factor3_pqtl_effs_wcorr_weights <- factor3_pqtl_effs_wcorr %>% 
+# merge all into a data frame for plotting
+Figure5C_data <- factor3_pqtl_effs_wcorr %>% 
   left_join( factor3_pqtl_lods) %>% 
   left_join( all_df_shared_weights %>% 
                filter( factor == "Factor3", feature %in% all.prots$protein_id) %>% 
@@ -607,7 +607,12 @@ factor3_pqtl_effs_wcorr_weights <- factor3_pqtl_effs_wcorr %>%
     `Protein weight` = protein_weight
   )
 
-factor3_pqtl_effs_wcorr_weights %>% 
+```
+
+
+```{r Figure5c_plot,  fig.width=6, fig.height=5, fig.cap = "Figure 5C: For all expressed proteins, the pQTL LOD score calculated at the Chr 15 QTL peak is plotted on the y-axis relative to the protein’s contribution (factor weight) to MOFA Factor 3 on the x-axis. Proteins with absolute factor weights less than 0.1 were filtered. Correlation between allele effects at the Chr 15 pQTL for individual proteins to allele effects of the Factor 3 QTL. Individual genes that mapped with a significant QTL (LOD > 7.5) are colored gray, and highlight that many proteins contribute substantially to Factor 3 and show high agreement in allele effects at the Chr 15 QTL (dark red and blue), despite not mapping individually with a significant QTL at that locus."}
+
+Figure5C_data %>% 
   filter( `LOD score` < 7.5, 
           abs(`Protein weight`) >0.1 ) %>% 
   ggplot()+
@@ -637,7 +642,7 @@ factor3_pqtl_effs_wcorr_weights %>%
 
 ```{r data_for_figure5c, fig.cap = "Data plotted in Figure 5C."}
 
-factor3_pqtl_effs_wcorr_weights %>% 
+Figure5C_data %>% 
   mutate_if( is.numeric, round, 2) %>% 
   create_dt()
 
@@ -649,7 +654,7 @@ factor3_pqtl_effs_wcorr_weights %>%
 ### Figure 5D: MOFA Factor 4 QTL on chromosome 10 
 
 
-```{r Figure5d_generate, cache = TRUE, fig.width=6, fig.height=5, fig.cap = "Figure 5D: For all expressed transcripts, the eQTL LOD score at the Chr 10 QTL peak is plotted on the y-axis relative to that transcript’s contribution to Factor 4 on the x-axis. Again, transcripts with absolute factor weights less than 0.1 were filtered, and individual points are as described in panel C. Many transcripts contribute to Factor 4 and have correlated allele effects at the Chr 10 QTL, despite individually failing to map with a significant Chr 10 eQTL."}
+```{r Figure_5D_prep, cache = TRUE}
 
 # get allele effects for MOFA Factor 4 on chr 10
 factor4_chr10_qtl <- all_df_shared_peaks_sig %>%
@@ -692,7 +697,7 @@ for( i in 1:5){
     
   }
 
-# pQTL
+# eQTL
 # convert to matrix
 eQTL_at_chr10_peak_effs <- eQTL_at_chr10_peak %>% 
   do.call(rbind,.) %>% 
@@ -721,8 +726,8 @@ factor4_eqtl_lods <- apply( esc.rna.scans[c(factor4_chr10_qtl$before, factor4_ch
   rename( eQTL_lod = value)
 rm(esc.rna.scans)
 
-# plot protein weight by pQTL LOD , colored by allele effect correlation
-factor4_eqtl_effs_wcorr_weights <- factor4_eqtl_effs_wcorr %>% 
+# merge all into a data frame
+Figure5D_data <- factor4_eqtl_effs_wcorr %>% 
   left_join( factor4_eqtl_lods) %>% 
   left_join( all_df_shared_weights %>% 
                filter( factor == "Factor4", feature %in% all.genes$ensembl_gene_id) %>% 
@@ -745,7 +750,14 @@ factor4_eqtl_effs_wcorr_weights <- factor4_eqtl_effs_wcorr %>%
     `Transcript weight` = transcript_weight
   )
 
-factor4_eqtl_effs_wcorr_weights %>% 
+
+```
+
+
+```{r Figure_5D_plot, fig.width=6, fig.height=5, fig.cap = "Figure 5D: For all expressed transcripts, the eQTL LOD score at the Chr 10 QTL peak is plotted on the y-axis relative to that transcript’s contribution to Factor 4 on the x-axis. Again, transcripts with absolute factor weights less than 0.1 were filtered, and individual points are as described in panel C. Many transcripts contribute to Factor 4 and have correlated allele effects at the Chr 10 QTL, despite individually failing to map with a significant Chr 10 eQTL."}
+
+
+Figure5D_data %>% 
   filter( `LOD score` < 7.5, 
           abs(`Transcript weight`) >0.1 ) %>% 
   ggplot()+
@@ -776,7 +788,7 @@ factor4_eqtl_effs_wcorr_weights %>%
 
 ```{r data_for_figure5d, fig.cap = "Data plotted in Figure 5D."}
 
-factor4_eqtl_effs_wcorr_weights %>% 
+Figure5D_data %>% 
   mutate_if( is.numeric, round, 2) %>% 
   create_dt()
 
@@ -789,9 +801,7 @@ factor4_eqtl_effs_wcorr_weights %>%
 
 ### Figure 5E: Mediation of Factor 4 QTL on chromosome 10
 
-
-
-```{r Figure5E, fig.width=12, fig.height=4, fig.cap ="Figure 5E:Genome-wide LOD scores obtained from the Factor 4 QTL scan is plotted with mediation results overlaid. Mediation with Gm20625 transcript abundance causes the largest decrease in QTL LOD score. Duxf3 expression was previously identified as a strong candidate mediator for the eQTL hotspot in this region (Skelly et al., 2020), but performs poorly as a mediator of the Factor 4 QTL compared to Gm20625. Both genes are highlighted in green next to their corresponding LOD score drop." }
+```{r Figure_5E_prep}
 
 # prep factor 4 qtl for mediation
 factor4_chr10_qtl <- factor4_chr10_qtl %>% 
@@ -898,6 +908,7 @@ factor4_prot_meds <-  get_meds(
   probs = shared.probs,
   covar = shared.covar
 )
+
 factor4_meds <- factor4_rna_meds %>% 
   mutate( type = "RNA") %>% 
   rbind( factor4_prot_meds %>% 
@@ -913,7 +924,6 @@ factor4_meds <- factor4_rna_meds %>%
     `Mediator midpoint (Mbp)` = middle
   )
 
-# lod plot 
 scan1_factor4_df <- scan1_factor4 %>% 
   as.data.frame( ) %>% 
   rename( `Factor 4 QTL` = "Factor4") %>% 
@@ -927,10 +937,46 @@ scan1_factor4_df <- scan1_factor4_df %>%
           `Coordinates (cM)` = pos_cM, 
           `Coordinates (bp)` = pos_bp) 
 
-scan1_factor4_df %>% 
+Figure5E_data_qtl_scan <- scan1_factor4_df %>% 
+  select( `Factor 4 QTL`, 
+          `Offestted chromosome coordinates` = cumsum_pos_bp,
+          marker,
+          Chromosome = chr,
+          `Coordinates (cM)` = pos_cM, 
+          `Coordinates (bp)` = pos_bp)
+
+Figure5E_data_mediation <- factor4_meds %>% 
+  select(
+    `Phenotype` = phenotype, 
+    `Mediator MGI symbol` = mgi_symbol,
+    `QTL chromosome` = peak_chr, 
+    `Mediator chromosome` = chr,
+    `QTL LOD` = peak_lod,
+    `Mediated LOD` = LOD,
+    `QTL position (Mbp)`= peak_pos_Mbp, 
+    `Mediator midpoint (Mbp)` = middle,
+    type
+  )
+
+```
+
+
+```{r Figure5E, fig.width=12, fig.height=4, fig.cap ="Figure 5E:Genome-wide LOD scores obtained from the Factor 4 QTL scan is plotted with mediation results overlaid. Mediation with Gm20625 transcript abundance causes the largest decrease in QTL LOD score. Duxf3 expression was previously identified as a strong candidate mediator for the eQTL hotspot in this region (Skelly et al., 2020), but performs poorly as a mediator of the Factor 4 QTL compared to Gm20625. Both genes are highlighted in green next to their corresponding LOD score drop." }
+
+
+
+# graphical prep for chromosome locations
+chroms <- c(as.character(1:19), "X")
+chrom_lens <- c( 195431559, 182107670, 160017104, 156496071, 151833620, 149721874, 145434693, 129399468, 124582650, 130685419, 122078650, 120120622 ,120387272, 124867725, 104015452, 98180002, 94984432, 90672596, 61417310 , 171028300)
+names(chrom_lens) <- chroms
+chrom_lens_offset <- cumsum(chrom_lens) - chrom_lens
+chrom_lens_midpt <- chrom_lens_offset + chrom_lens / 2
+
+# lod plot 
+Figure5E_data_qtl_scan %>% 
   ggplot()+
     aes( 
-      x= cumsum_pos_bp,
+      x= `Offestted chromosome coordinates`,
       y = `Factor 4 QTL`
       )+
   geom_line( size = 1, col = "dark gray",alpha = 0.8)+
@@ -944,28 +990,28 @@ scan1_factor4_df %>%
 
 # overlay mediation
 # highlights
-factor4_meds_min <- factor4_meds %>% 
-  slice_min( LOD)
-factor4_meds_duxf <- factor4_meds %>% 
-  filter(mgi_symbol == "Duxf3")
+factor4_meds_min <- Figure5E_data_mediation %>% 
+  slice_min( `Mediated LOD`)
+factor4_meds_duxf <- Figure5E_data_mediation %>% 
+  filter(`Mediator MGI symbol` == "Duxf3")
 
 factor4_lod_plot+
-  geom_point( data = factor4_meds, 
-              aes( x = middle*1e06+chrom_lens_offset[factor4_chr10_qtl$peak_chr],
+  geom_point( data = Figure5E_data_mediation, 
+              aes( x = middle*1e06+chrom_lens_offset[10],
                    y = LOD),
               col = qtl.colors[["rna"]],
               size = 4,
               alpha = 0.9)+
   annotate( "label", 
             y = factor4_meds_min$LOD+0.1, 
-            x =factor4_meds_min$middle*1e06+chrom_lens_offset[factor4_chr10_qtl$peak_chr]-1.9e08 ,
+            x =factor4_meds_min$middle*1e06+chrom_lens_offset[10]-1.9e08 ,
             label = factor4_meds_min$mgi_symbol, 
             size = 6, 
             col = qtl.colors[["rna"]],
             fontface = "italic")+
   annotate("label",
            y = factor4_meds_duxf$LOD+0.1, 
-            x =factor4_meds_duxf$middle*1e06+chrom_lens_offset[factor4_chr10_qtl$peak_chr]-1.3e08 ,
+            x =factor4_meds_duxf$middle*1e06+chrom_lens_offset[10]-1.3e08 ,
             label = factor4_meds_duxf$mgi_symbol, 
             size = 6, 
             col = qtl.colors[["rna"]],
@@ -980,13 +1026,7 @@ factor4_med_plot
 
 ```{r Figure5e_data, fig.cap = "QTL scan plotted in Figure 5E."}
 
-scan1_factor4_df %>% 
-  select( `Factor 4 QTL`, 
-          `Offestted chromosome coordinates` = cumsum_pos_bp,
-          marker,
-          Chromosome = chr,
-          `Coordinates (cM)` = pos_cM, 
-          `Coordinates (bp)` = pos_bp) %>% 
+Figure5E_data_qtl_scan %>% 
   mutate_if(is.numeric, round ,3) %>% 
   create_dt()
 
@@ -996,18 +1036,7 @@ scan1_factor4_df %>%
 
 ```{r Figure5e_data2, fig.cap = "Mediation results plotted in Figure 5E."}
 
-factor4_meds %>% 
-  select(
-    `Phenotype` = phenotype, 
-    `Mediator MGI symbol` = mgi_symbol,
-    `QTL chromosome` = peak_chr, 
-    `Mediator chromosome` = chr,
-    `QTL LOD` = peak_lod,
-    `Mediated LOD` = LOD,
-    `QTL position (Mbp)`= peak_pos_Mbp, 
-    `Mediator midpoint (Mbp)` = middle,
-    type
-  ) %>% 
+Figure5E_data_mediation %>% 
   mutate_if(is.numeric, round, 2) %>% 
   arrange(`Mediated LOD`) %>% 
   create_dt()
