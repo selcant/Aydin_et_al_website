@@ -273,19 +273,19 @@ circos.clear()
 
 <br>
 
+Data used to generate Figure 3A can be downloaded below.
 
-```{r Table_prot_atac_cor1, fig.cap = "Data used in Figure 3A to generate the genomic regions in the circos plot."}
+```{r Figure_3A_data, fig.cap = "Data used in Figure 3A to generate the genomic regions in the circos plot."}
 
-id1_atac_peaks %>% 
-  mutate_if( is.numeric, round ,2) %>% 
-  create_dt()
-
-```
-
-```{r Table_prot_atac_cor2, fig.cap = "Data used in Figure 3A to add ID1 gene annotation."}
-
-id1_gene %>% 
-  create_dt()
+list(id1_atac_peaks, create_dt) %>% 
+    downloadthis::download_this(
+    output_name = "Figure3A data",
+    output_extension = ".xlsx",
+    button_label = "Download datasets as xlsx",
+    button_type = "warning",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
 
 ```
 

@@ -348,6 +348,7 @@ figure5a
 ```{r Figure_5A_data_variation_explained}
 
 Figure5A_data_var_exp %>% 
+  mutate_if( is.numeric, round, 2) %>% 
   create_dt()
 
 ```
@@ -357,6 +358,7 @@ Figure5A_data_var_exp %>%
 ```{r Figure_5A_data_correlation_to_covariates}
 
 Figure5A_data_cor_to_covar %>% 
+  mutate_if( is.numeric, round, 2) %>% 
   create_dt()
 
 ```
@@ -366,6 +368,7 @@ Figure5A_data_cor_to_covar %>%
 ```{r Figure_5A_data_tf_overrepresentation}
 
 Figure5A_data_tf_ora %>% 
+  mutate_if( is.numeric, round, 2) %>% 
   create_dt()
 
 ```
@@ -594,7 +597,7 @@ Figure5C_data <- factor3_pqtl_effs_wcorr %>%
   ) %>%
   # add protein details
   left_join( ., all.prots2 %>% 
-               select( protein_id, gene_chr, midpoint)) %>% 
+               select( protein_id, gene_chr, midpoint, mgi_symbol)) %>% 
   # add mofa qtl details
   cbind( ., factor3_chr15_qtl %>% 
            select( factor3_qtl_pos =interp_bp_peak , factor3_qtl_peak_chr = peak_chr)
@@ -604,6 +607,7 @@ Figure5C_data <- factor3_pqtl_effs_wcorr %>%
               abs( midpoint - as.numeric(factor3_qtl_pos)) < 10e06 ) ) %>% 
   select(
     `Protein ID` = protein_id,
+    `MGI symbol` = mgi_symbol,
     `Correlation between QTL effects` = pqtl_cor,
     `LOD score` = pQTL_lod,
     `Protein weight` = protein_weight
@@ -612,7 +616,7 @@ Figure5C_data <- factor3_pqtl_effs_wcorr %>%
 ```
 
 
-```{r Figure5c_plot,  fig.width=6, fig.height=5, fig.cap = "Figure 5C: For all expressed proteins, the pQTL LOD score calculated at the Chr 15 QTL peak is plotted on the y-axis relative to the protein’s contribution (factor weight) to MOFA Factor 3 on the x-axis. Proteins with absolute factor weights less than 0.1 were filtered. Correlation between allele effects at the Chr 15 pQTL for individual proteins to allele effects of the Factor 3 QTL. Individual genes that mapped with a significant QTL (LOD > 7.5) are colored gray, and highlight that many proteins contribute substantially to Factor 3 and show high agreement in allele effects at the Chr 15 QTL (dark red and blue), despite not mapping individually with a significant QTL at that locus."}
+```{r Figure5c_plot,  fig.width=8, fig.height=4, fig.cap = "Figure 5C: For all expressed proteins, the pQTL LOD score calculated at the Chr 15 QTL peak is plotted on the y-axis relative to the protein’s contribution (factor weight) to MOFA Factor 3 on the x-axis. Proteins with absolute factor weights less than 0.1 were filtered. Correlation between allele effects at the Chr 15 pQTL for individual proteins to allele effects of the Factor 3 QTL. Individual genes that mapped with a significant QTL (LOD > 7.5) are colored gray, and highlight that many proteins contribute substantially to Factor 3 and show high agreement in allele effects at the Chr 15 QTL (dark red and blue), despite not mapping individually with a significant QTL at that locus."}
 
 Figure5C_data %>% 
   filter( `LOD score` < 7.5, 
@@ -621,22 +625,25 @@ Figure5C_data %>%
   aes(
     x = `Protein weight`,
     y =  `LOD score`,
-    col = `Correlation between QTL effects`
+    col = `Correlation between QTL effects`,
+    text = paste("Gene: ", `MGI symbol`) 
   )+
   geom_point(size = 3, alpha = 0.6)+
   theme_pubclean(base_size = 18)+
   scale_color_gradient2( limits = c(-1,1))+
   xlab("Protein weight")+
   ylab("LOD score")+
-  labs( col = "Correlation between QTL effects") +
+  labs( col = "Correlation between\nQTL effects") +
   xlim(-0.75,0.4)+
   ylim(0,15)+
-  theme(legend.text = element_text(angle = 30), 
-        legend.position = "top",
+  theme(legend.text = element_text(angle = 0), 
+        legend.position = "right",
         legend.title = element_text(vjust = 1))+
   # add the signifincatn qtl in gray
   geom_point( data = filter(Figure5C_data, `LOD score` > 7.5, abs(`Protein weight`)>0.1),
-              col = "gray", size =3, alpha = 0.6)
+              col = "gray", size =3, alpha = 0.6) -> Figure5C
+
+ggplotly(Figure5C)
   
 ```
 
@@ -737,7 +744,7 @@ Figure5D_data <- factor4_eqtl_effs_wcorr %>%
   ) %>% 
   # add gene details
   left_join( ., all.genes2 %>% 
-               select( ensembl_gene_id, midpoint, gene_chr)) %>% 
+               select( ensembl_gene_id, midpoint, gene_chr, mgi_symbol)) %>% 
   # add mofa qtl details
   cbind(., factor4_chr10_qtl %>% 
           select( factor4_qtl_pos =interp_bp_peak , factor4_qtl_peak_chr = peak_chr)
@@ -747,6 +754,7 @@ Figure5D_data <- factor4_eqtl_effs_wcorr %>%
               abs( midpoint - as.numeric(factor4_qtl_pos)) < 10e06 ) ) %>% 
   select(
     `Gene ID` = ensembl_gene_id,
+    `MGI symbol` = mgi_symbol,
     `Correlation between QTL effects` = eqtl_cor,
     `LOD score` = eQTL_lod,
     `Transcript weight` = transcript_weight
@@ -756,7 +764,7 @@ Figure5D_data <- factor4_eqtl_effs_wcorr %>%
 ```
 
 
-```{r Figure_5D_plot, fig.width=6, fig.height=5, fig.cap = "Figure 5D: For all expressed transcripts, the eQTL LOD score at the Chr 10 QTL peak is plotted on the y-axis relative to that transcript’s contribution to Factor 4 on the x-axis. Again, transcripts with absolute factor weights less than 0.1 were filtered, and individual points are as described in panel C. Many transcripts contribute to Factor 4 and have correlated allele effects at the Chr 10 QTL, despite individually failing to map with a significant Chr 10 eQTL."}
+```{r Figure_5D_plot, fig.width=8, fig.height=4, fig.cap = "Figure 5D: For all expressed transcripts, the eQTL LOD score at the Chr 10 QTL peak is plotted on the y-axis relative to that transcript’s contribution to Factor 4 on the x-axis. Again, transcripts with absolute factor weights less than 0.1 were filtered, and individual points are as described in panel C. Many transcripts contribute to Factor 4 and have correlated allele effects at the Chr 10 QTL, despite individually failing to map with a significant Chr 10 eQTL."}
 
 
 Figure5D_data %>% 
@@ -766,14 +774,15 @@ Figure5D_data %>%
   aes(
     x = `Transcript weight`,
     y =  `LOD score`,
-    col = `Correlation between QTL effects`
+    col = `Correlation between QTL effects`,
+    text = paste("Gene: ", `MGI symbol`) 
   )+
   geom_point(size = 3, alpha = 0.6)+
   theme_pubclean(base_size = 18)+
   scale_color_gradient2( limits = c(-1,1))+
   xlab("Transcript weight")+
   ylab("LOD score")+
-  labs( col = "Correlation between QTL effects") +
+  labs( col = "Correlation between\nQTL effects") +
   ylim(0,15)+
   xlim(-0.5, 1)+
   theme(legend.text = element_text(angle = 30), 
@@ -781,7 +790,9 @@ Figure5D_data %>%
         legend.title = element_text(vjust = 1))+
   # add the signifincatn qtl in gray
   geom_point( data = filter(Figure5D_data, `LOD score` > 7.5, abs(`Transcript weight`)>0.1),
-              col = "gray", size =3, alpha = 0.6)
+              col = "gray", size =3, alpha = 0.6) -> Figure5D
+
+ggplotly(Figure5D)
 
 ```
 
@@ -1026,11 +1037,19 @@ factor4_med_plot
 
 <br>
 
+QTL scan used in plotting Figure 5E can be downloaded below.
+
 ```{r Figure5e_data, fig.cap = "QTL scan plotted in Figure 5E."}
 
-Figure5E_data_qtl_scan %>% 
-  mutate_if(is.numeric, round ,3) %>% 
-  create_dt()
+list(Figure5E_data_qtl_scan) %>% 
+  downloadthis::download_this(    output_name = "QTL scan plotted in Figure 5E.",
+    output_extension = ".xlsx",
+    button_label = "Download datasets as xlsx",
+    button_type = "warning",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+    )
+  
 
 ```
 

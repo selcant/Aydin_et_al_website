@@ -53,7 +53,13 @@ Figure4A_data <- peaks.esc_prot_annotated %>%
   select(
     `Protein ID`= protein_id,
     `Offsetted QTL peak location (bp)` = cumsum_bp_peak,
-    `Offsetted gene midpoint (bp)` = cumsum_bp_gene
+    `Offsetted gene midpoint (bp)` = cumsum_bp_gene,
+    `QTL peak (chr)` = peak_chr,
+    `QTL peak (bp)` = interp_bp_peak,
+    `MGI symbol` = mgi_symbol,
+    `Gene start` = gene_start,
+    `Gene end` = gene_end,
+    `Gene chr` = gene_chr
   )
 
 
@@ -89,10 +95,14 @@ ggplot()+
   scale_fill_manual(values = c("dark gray","white"))+
   geom_point(data = Figure4A_data, 
             aes( x =  `Offsetted QTL peak location (bp)`, 
-                 y = `Offsetted gene midpoint (bp)`),
+                 y = `Offsetted gene midpoint (bp)`, 
+                 text = paste0("Gene: ",`MGI symbol`, "\n","chr", `Gene chr`,":",`Gene start`,"-",`Gene end`, "\n",
+                               "QTL position: chr", `QTL peak (chr)`, ":",`QTL peak (bp)`)
+                 ),
             size = 2, 
             col =qtl.colors[["prot"]],
-             inherit.aes = FALSE )+
+             inherit.aes = FALSE ,
+            )+
   theme_pubclean(base_size = 16)+
   scale_x_discrete( name = "pQTL",
                     limits = chrom_lens_midpt, 
@@ -103,18 +113,27 @@ ggplot()+
           panel.grid.major.x = element_blank(),
           panel.grid.major.y = element_blank()) -> pqtl_plot
 
-pqtl_plot
+ggplotly(pqtl_plot, tooltip = "text")
 
 ```
 
 
 <br>
 
+Data used in making the interactive plot above can be downloaded below.
+
 ```{r Figure_4A_data, fig.cap="Significant pQTL details plotted in Figure 4A.", warning=FALSE, message=FALSE}
 
 
-Figure4A_data %>% 
-  create_dt()
+list(Figure4A_data) %>% 
+    downloadthis::download_this(
+    output_name = "Figure4A data",
+    output_extension = ".xlsx",
+    button_label = "Download datasets as xlsx",
+    button_type = "warning",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
 
 ```
 
@@ -677,23 +696,22 @@ figure_4C
 
 <br>
 
+QTL scan and effects data used in plotting Figure 4C can be downloaded below.
+
 ```{r Figure4C_data, fig.cap="QTL scans used to generate Figure 4C."}
 
- Figure_4C_data_scans %>% 
-  mutate_if( is.numeric, round ,2) %>% 
-  create_dt()
-
+ list(Figure_4C_data_scans, Figure_4C_data_effs) %>%
+  downloadthis::download_this(
+    output_name = "Figure4C data",
+    output_extension = ".xlsx",
+    button_label = "Download datasets as xlsx",
+    button_type = "warning",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
+  
 ```
 
-<br>
-
-```{r Figure4C_data2, fig.cap="Haplotype effects used to generate Figure 4C."}
-
-Figure_4C_data_effs %>%
-  mutate_if(is.numeric , round, 2) %>% 
-  create_dt()
-
-```
 
 
 <br>
@@ -820,12 +838,19 @@ trans_band_plot
 
 <br>
 
+Data used in plotting Figure 4D can be downloaded below.
+
 ```{r Figure_4D_data, fig.cap="Data used in plotting Figure 4D.", warning=FALSE, message=FALSE}
 
-Figure4D_data %>% 
-  arrange( as.numeric(Chr)) %>% 
-  create_dt()
-
+list(Figure4D_data) %>% 
+  downloadthis::download_this(
+    output_name = "Figure4D data",
+    output_extension = ".xlsx",
+    button_label = "Download datasets as xlsx",
+    button_type = "warning",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
 
 ```
 
@@ -1287,30 +1312,20 @@ Figure_4E
 
 <br>
 
-```{r Figure4E_data_qtl_scans, fig.cap="QTL scans used in plotting LOD plots in Figure 4E."}
+QTL scans and the effects used in plotting Figure 4E can be downloded below.
+
+```{r Figure4E_data, fig.cap="QTL scans used in plotting LOD plots in Figure 4E."}
 
 
-Figure_4E_data_scans %>% 
-  select( Protein, 
-          `LOD score` , 
-          `Marker Position (bp)`) %>% 
-  mutate(`LOD score` = formatC(`LOD score`, digits =2)) %>% 
-  create_dt()
-
-
-```
-
-<br>
-
-```{r Figure4E_data_effects, fig.cap="Haplotype effects plotted in Figure 4E."}
-
-Figure_4E_data_effs %>% 
-  select( Protein,
-          Strain,
-          `pQTL effect`) %>% 
-  mutate_if( is.numeric, round ,2) %>% 
-  create_dt()
-  
+list(Figure_4E_data_scans, Figure_4E_data_effs) %>% 
+    downloadthis::download_this(
+    output_name = "Figure4E data",
+    output_extension = ".xlsx",
+    button_label = "Download datasets as xlsx",
+    button_type = "warning",
+    has_icon = TRUE,
+    icon = "fa fa-save"
+  )
 
 ```
 
