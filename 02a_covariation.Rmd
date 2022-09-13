@@ -277,7 +277,7 @@ Data used to generate Figure 3A can be downloaded below.
 
 ```{r Figure_3A_data, fig.cap = "Data used in Figure 3A to generate the genomic regions in the circos plot."}
 
-list(id1_atac_peaks, create_dt) %>% 
+list(id1_atac_peaks, id1_gene) %>% 
     downloadthis::download_this(
     output_name = "Figure3A data",
     output_extension = ".xlsx",
