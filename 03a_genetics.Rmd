@@ -111,7 +111,8 @@ ggplot()+
   scale_y_discrete( name = "Protein coding gene",limits = chrom_lens_midpt, labels = names(chrom_lens), expand = expansion( mult = 0.02))+
   theme( axis.text = element_text(size = 10),
           panel.grid.major.x = element_blank(),
-          panel.grid.major.y = element_blank()) -> pqtl_plot
+          panel.grid.major.y = element_blank(),
+         legend.position = "none") -> pqtl_plot
 
 ggplotly(pqtl_plot, tooltip = "text")
 
