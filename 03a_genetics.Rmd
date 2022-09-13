@@ -65,6 +65,8 @@ Figure4A_data <- peaks.esc_prot_annotated %>%
 
 ```
 
+<br> 
+
 ```{r Figure4A_plot, message=FALSE, warning=FALSE, fig.cap="Figure 4A: Genetic mapping identifies 1,677 significant pQTL (LOD >7.5, permutation genome-wide p < 0.05, FDR = 0.06) where 1,056 are local (within 10Mb of the protein coding gene, seen on the diagonal) and 621 are distant (off the diagonal). pQTL are plotted across the genome where the x-axis shows the location of the pQTL and the y-axis shows the midpoint of the protein coding gene.", fig.height=6, fig.width=7}
 
 
@@ -111,14 +113,18 @@ ggplot()+
   scale_y_discrete( name = "Protein coding gene",limits = chrom_lens_midpt, labels = names(chrom_lens), expand = expansion( mult = 0.02))+
   theme( axis.text = element_text(size = 10),
           panel.grid.major.x = element_blank(),
-          panel.grid.major.y = element_blank(),
-         legend.position = "none") -> pqtl_plot
+          panel.grid.major.y = element_blank()
+         #legend.position = "none",
+        #plot.margin = unit(c(1, 1, 1, 2), "cm")
+        ) -> pqtl_plot
 
-ggplotly(pqtl_plot, tooltip = "text")
+#ggplotly(pqtl_plot, tooltip = "text")
+
+pqtl_plot
 
 ```
 
-
+<br>
 <br>
 
 Data used in making the interactive plot above can be downloaded below.

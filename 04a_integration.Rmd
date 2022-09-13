@@ -615,8 +615,9 @@ Figure5C_data <- factor3_pqtl_effs_wcorr %>%
 
 ```
 
+<br>
 
-```{r Figure5c_plot,  fig.width=8, fig.height=4, fig.cap = "Figure 5C: For all expressed proteins, the pQTL LOD score calculated at the Chr 15 QTL peak is plotted on the y-axis relative to the protein’s contribution (factor weight) to MOFA Factor 3 on the x-axis. Proteins with absolute factor weights less than 0.1 were filtered. Correlation between allele effects at the Chr 15 pQTL for individual proteins to allele effects of the Factor 3 QTL. Individual genes that mapped with a significant QTL (LOD > 7.5) are colored gray, and highlight that many proteins contribute substantially to Factor 3 and show high agreement in allele effects at the Chr 15 QTL (dark red and blue), despite not mapping individually with a significant QTL at that locus."}
+```{r Figure5c_plot,  fig.width=6, fig.height=5, fig.cap = "Figure 5C: For all expressed proteins, the pQTL LOD score calculated at the Chr 15 QTL peak is plotted on the y-axis relative to the protein’s contribution (factor weight) to MOFA Factor 3 on the x-axis. Proteins with absolute factor weights less than 0.1 were filtered. Correlation between allele effects at the Chr 15 pQTL for individual proteins to allele effects of the Factor 3 QTL. Individual genes that mapped with a significant QTL (LOD > 7.5) are colored gray, and highlight that many proteins contribute substantially to Factor 3 and show high agreement in allele effects at the Chr 15 QTL (dark red and blue), despite not mapping individually with a significant QTL at that locus."}
 
 Figure5C_data %>% 
   filter( `LOD score` < 7.5, 
@@ -636,15 +637,17 @@ Figure5C_data %>%
   labs( col = "Correlation between\nQTL effects") +
   xlim(-0.75,0.4)+
   ylim(0,15)+
-  theme(legend.text = element_text(angle = 0), 
-        legend.position = "right",
-        legend.title = element_text(vjust = 1))+
+  theme(legend.text = element_text(angle = 30), 
+        legend.position = "top",
+        legend.title = element_text(vjust = 1.3))+
   # add the signifincatn qtl in gray
   geom_point( data = filter(Figure5C_data, `LOD score` > 7.5, abs(`Protein weight`)>0.1),
-              col = "gray", size =3, alpha = 0.6) -> Figure5C
+              col = "gray", size =3, alpha = 0.6)-> Figure5C
 
-ggplotly(Figure5C)
-  
+#ggplotly(Figure5C,  width = 700, height = 400)
+ 
+Figure5C 
+
 ```
 
 <br>
@@ -763,8 +766,10 @@ Figure5D_data <- factor4_eqtl_effs_wcorr %>%
 
 ```
 
+<br>
 
-```{r Figure_5D_plot, fig.width=8, fig.height=4, fig.cap = "Figure 5D: For all expressed transcripts, the eQTL LOD score at the Chr 10 QTL peak is plotted on the y-axis relative to that transcript’s contribution to Factor 4 on the x-axis. Again, transcripts with absolute factor weights less than 0.1 were filtered, and individual points are as described in panel C. Many transcripts contribute to Factor 4 and have correlated allele effects at the Chr 10 QTL, despite individually failing to map with a significant Chr 10 eQTL."}
+
+```{r Figure_5D_plot, fig.width=6, fig.height=5, fig.cap = "Figure 5D: For all expressed transcripts, the eQTL LOD score at the Chr 10 QTL peak is plotted on the y-axis relative to that transcript’s contribution to Factor 4 on the x-axis. Again, transcripts with absolute factor weights less than 0.1 were filtered, and individual points are as described in panel C. Many transcripts contribute to Factor 4 and have correlated allele effects at the Chr 10 QTL, despite individually failing to map with a significant Chr 10 eQTL."}
 
 
 Figure5D_data %>% 
@@ -787,15 +792,15 @@ Figure5D_data %>%
   xlim(-0.5, 1)+
   theme(legend.text = element_text(angle = 30), 
         legend.position = "top",
-        legend.title = element_text(vjust = 1))+
-  # add the signifincatn qtl in gray
+        legend.title = element_text(vjust = 1.3))+
+  # add the significant qtl in gray
   geom_point( data = filter(Figure5D_data, `LOD score` > 7.5, abs(`Transcript weight`)>0.1),
               col = "gray", size =3, alpha = 0.6) -> Figure5D
 
-ggplotly(Figure5D)
+#ggplotly(Figure5D, width = 700, height = 400)
+Figure5D
 
 ```
-
 
 <br>
 
