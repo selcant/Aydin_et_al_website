@@ -282,7 +282,7 @@ list(id1_atac_peaks, id1_gene) %>%
     output_name = "Figure3A data",
     output_extension = ".xlsx",
     button_label = "Download datasets as xlsx",
-    button_type = "warning",
+    button_type = "primary",
     has_icon = TRUE,
     icon = "fa fa-save"
   )
@@ -560,7 +560,17 @@ writexl::write_xlsx( table_s4,
 
 ```{r TableS4_display,  echo =FALSE}
 
-xfun::embed_file(here("Table_S4.xlsx"))
+#xfun::embed_file(here("Table_S4.xlsx"))
+
+download_file(
+  path = system.file(here("Table_S4.xlsx"), package = "downloadthis"),
+  output_name = "Table_S4",
+  button_label = "Download Table_S4.xlsx",
+  button_type = "primary",
+  has_icon = TRUE,
+  icon = "fa fa-save",
+  self_contained = FALSE
+)
 
 ```
 

@@ -382,7 +382,17 @@ MOFA factor values (columns) for each of the 163 samples (rows) are listed in th
 
 ```{r table_S7_embed, echo = FALSE}
 
-xfun::embed_file(here("Table_S7.xlsx"))
+# xfun::embed_file(here("Table_S7.xlsx"))
+
+download_file(
+  path = system.file(here("Table_S7.xlsx"), package = "downloadthis"),
+  output_name = "Table_S7",
+  button_label = "Download Table_S7.xlsx",
+  button_type = "primary",
+  has_icon = TRUE,
+  icon = "fa fa-save",
+  self_contained = FALSE
+)
 
 ```
 
@@ -1049,8 +1059,8 @@ QTL scan used in plotting Figure 5E can be downloaded below.
 list(Figure5E_data_qtl_scan) %>% 
   downloadthis::download_this(    output_name = "QTL scan plotted in Figure 5E.",
     output_extension = ".xlsx",
-    button_label = "Download datasets as xlsx",
-    button_type = "warning",
+    button_label = "Download Figure 5E data as xlsx",
+    button_type = "primary",
     has_icon = TRUE,
     icon = "fa fa-save"
     )

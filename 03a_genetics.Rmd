@@ -136,8 +136,8 @@ list(Figure4A_data) %>%
     downloadthis::download_this(
     output_name = "Figure4A data",
     output_extension = ".xlsx",
-    button_label = "Download datasets as xlsx",
-    button_type = "warning",
+    button_label = "Download Figure 4A data as xlsx",
+    button_type = "primary",
     has_icon = TRUE,
     icon = "fa fa-save"
   )
@@ -190,7 +190,17 @@ peaks.esc_prot_annotated %>%
 #                     )
 
 
-xfun::embed_file(here("Table_S5.xlsx"))
+# xfun::embed_file(here("Table_S5.xlsx"))
+
+download_file(
+  path = system.file(here("Table_S5.xlsx"), package = "downloadthis"),
+  output_name = "Table_S5",
+  button_label = "Download Table_S5.xlsx",
+  button_type = "primary",
+  has_icon = TRUE,
+  icon = "fa fa-save",
+  self_contained = FALSE
+)
 
 
 ```
@@ -711,8 +721,8 @@ QTL scan and effects data used in plotting Figure 4C can be downloaded below.
   downloadthis::download_this(
     output_name = "Figure4C data",
     output_extension = ".xlsx",
-    button_label = "Download datasets as xlsx",
-    button_type = "warning",
+    button_label = "Download Figure 4C data as xlsx",
+    button_type = "primary",
     has_icon = TRUE,
     icon = "fa fa-save"
   )
@@ -853,8 +863,8 @@ list(Figure4D_data) %>%
   downloadthis::download_this(
     output_name = "Figure4D data",
     output_extension = ".xlsx",
-    button_label = "Download datasets as xlsx",
-    button_type = "warning",
+    button_label = "Download Figure 4D data as xlsx",
+    button_type = "primary",
     has_icon = TRUE,
     icon = "fa fa-save"
   )
@@ -973,8 +983,17 @@ peaks.esc_prot_annotated %>%
 #                     )
 # 
 
-xfun::embed_file(here("Table_S6.xlsx"))
+# xfun::embed_file(here("Table_S6.xlsx"))
 
+download_file(
+  path = system.file(here("Table_S6.xlsx"), package = "downloadthis"),
+  output_name = "Table_S6",
+  button_label = "Download Table_S6.xlsx",
+  button_type = "primary",
+  has_icon = TRUE,
+  icon = "fa fa-save",
+  self_contained = FALSE
+)
 
 
 ```
@@ -1328,8 +1347,8 @@ list(Figure_4E_data_scans, Figure_4E_data_effs) %>%
     downloadthis::download_this(
     output_name = "Figure4E data",
     output_extension = ".xlsx",
-    button_label = "Download datasets as xlsx",
-    button_type = "warning",
+    button_label = "Download Figure 4E data as xlsx",
+    button_type = "primary",
     has_icon = TRUE,
     icon = "fa fa-save"
   )
