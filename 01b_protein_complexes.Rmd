@@ -417,93 +417,93 @@ ggarrange(fig_s2c,
 
 <br>
 
-#### Figure S2D: Complex membership in most stable and variable complexes
+<!-- #### Figure S2D: Complex membership in most stable and variable complexes -->
 
-```{r FigureS2D, fig.cap="Figure S2D: Variable complexes are more likely to have promiscuous subunits that are part of more than 2 complexes. Pairwise Pearson correlation coefficients plotted for all subunits that are part of stable (upper 10th percentile, most cohesive) and variable (lower 10th percentile, least cohesive) complexes where the proteins are colored by the number of complexes they belong to.", fig.width=16, fig.height=8}
+<!-- ```{r FigureS2D, fig.cap="Figure S2D: Variable complexes are more likely to have promiscuous subunits that are part of more than 2 complexes. Pairwise Pearson correlation coefficients plotted for all subunits that are part of stable (upper 10th percentile, most cohesive) and variable (lower 10th percentile, least cohesive) complexes where the proteins are colored by the number of complexes they belong to.", fig.width=16, fig.height=8} -->
 
-complexes_annotated %>% 
-  filter( complex_type != "none") %>% 
-  left_join( select(complex_prot_cor_df, cor_prot, protein_id = protein_id_row, `Complex Name`)) %>% 
-  left_join(select(complex_genes_annotated, `Complex Name`, protein_id, n_overlap, cor_complex_prot)) %>% 
-  arrange( desc(cor_complex_prot) )%>% 
-  mutate( label = factor(`Complex Name`, levels = unique(`Complex Name`))) %>% 
-  ggplot()+
-  aes(y = label,
-      x = cor_prot,
-      col = as_factor(n_overlap))+
-  geom_point(size = 3, alpha = 0.6)+
-  theme_pubclean(18)+
-  scale_color_viridis_d( option = "C")+
-  theme(
-        legend.text = element_text(angle=0, vjust=0, size =14))+
-  ylab("")+
-  xlab("Correlation")+
-  xlim(c(-1,1))+
-  labs(col = "Complex membership")+
-  facet_wrap(~complex_type, ncol = 2, nrow = 1, scales= "free") -> figure_s2d
+<!-- complexes_annotated %>%  -->
+<!--   filter( complex_type != "none") %>%  -->
+<!--   left_join( select(complex_prot_cor_df, cor_prot, protein_id = protein_id_row, `Complex Name`)) %>%  -->
+<!--   left_join(select(complex_genes_annotated, `Complex Name`, protein_id, n_overlap, cor_complex_prot)) %>%  -->
+<!--   arrange( desc(cor_complex_prot) )%>%  -->
+<!--   mutate( label = factor(`Complex Name`, levels = unique(`Complex Name`))) %>%  -->
+<!--   ggplot()+ -->
+<!--   aes(y = label, -->
+<!--       x = cor_prot, -->
+<!--       col = as_factor(n_overlap))+ -->
+<!--   geom_point(size = 3, alpha = 0.6)+ -->
+<!--   theme_pubclean(18)+ -->
+<!--   scale_color_viridis_d( option = "C")+ -->
+<!--   theme( -->
+<!--         legend.text = element_text(angle=0, vjust=0, size =14))+ -->
+<!--   ylab("")+ -->
+<!--   xlab("Correlation")+ -->
+<!--   xlim(c(-1,1))+ -->
+<!--   labs(col = "Complex membership")+ -->
+<!--   facet_wrap(~complex_type, ncol = 2, nrow = 1, scales= "free") -> figure_s2d -->
 
-ggarrange(figure_s2d, 
-          labels = "D",
-          font.label = list( size = 24))
-
-
-```
+<!-- ggarrange(figure_s2d,  -->
+<!--           labels = "D", -->
+<!--           font.label = list( size = 24)) -->
 
 
-<br>
+<!-- ``` -->
 
-#### Figure S2E: Proteins that belong to multiple complexes show variable behaviour in complex preference
 
-```{r, FigureS2E, fig.cap="Figure S2E: Promiscuous proteins vary in preference of complexes. Boxplots of median pairwise Pearson correlations of complex subunits across various complexes they are part of are plotted. The complex subunits are separated into two categories based on the total number of complexes they belong to.", fig.height=7, fig.width=10}
+<!-- <br> -->
 
-promscs_genes <- complex_genes_annotated %>% 
-  filter( #promiscs==TRUE,
-          n_overlap > 2) %>% 
-  select( protein_id) %>% 
-  distinct() 
+<!-- #### Figure S2E: Proteins that belong to multiple complexes show variable behaviour in complex preference -->
 
-complex_genes_annotated %>% 
-  filter( protein_id %in%  promscs_genes$protein_id) %>% 
-  group_by(protein_id) %>% 
-  #filter( n_distinct(`Complex Name`) > 2) %>% 
-  mutate( mean_prot = mean(cor_gene_prot, na.rm=T),
-          sd_prot = sqrt(var(cor_gene_prot, na.rm=T)),
-          cv_prot = abs(sd_prot/mean_prot) ,
-          n_complex = n()) %>% 
-  ungroup() %>% 
-  filter(!is.na(sd_prot), n_complex > 2)-> shared_complex_prots
-  
+<!-- ```{r, FigureS2E, fig.cap="Figure S2E: Promiscuous proteins vary in preference of complexes. Boxplots of median pairwise Pearson correlations of complex subunits across various complexes they are part of are plotted. The complex subunits are separated into two categories based on the total number of complexes they belong to.", fig.height=7, fig.width=10} -->
 
-shared_complex_prots %>% 
-  #filter( !protein_id %in% low_cor_genes$protein_id ) %>% 
-  mutate( size = ifelse( n_overlap > 3, "Complex membership >3","Complex membership = 3" )) %>% 
-  group_by(mgi_symbol) %>%
-  mutate(new_symbol = ifelse( protein_id =="ENSMUSP00000130611", "ACTB-208",
-                              ifelse( protein_id == "ENSMUSP00000098066", "ACTB-201", toupper(mgi_symbol) ))) %>% 
-  arrange( sd_prot) %>% 
-  mutate( label = factor(new_symbol , levels = unique(new_symbol)) ) %>% 
-  ggplot()+
-  aes( x = cor_gene_prot,
-       y = reorder(label, -sd_prot),
-      col = sd_prot
-       )+
-  geom_point( size = 4, alpha = 1)+
-  # geom_beeswarm( size = 3, alpha=1, groupOnX = F)+
-  # geom_boxplot( alpha =0.8,
-  #               outlier.colour = "darkgoldenrod1",
-  #               outlier.size = 3)+
-  theme_pubclean(base_size = 16)+
-  ylab("")+
-  xlab("Median correlation per gene per complex")+
-  scale_color_viridis(option = "magma", direction = 1)+
-  labs(col="Standard deviation")+
-  theme(legend.text = element_text(angle=45))+
-  facet_wrap(~size, scales="free_y") -> figure_s2e
+<!-- promscs_genes <- complex_genes_annotated %>%  -->
+<!--   filter( #promiscs==TRUE, -->
+<!--           n_overlap > 2) %>%  -->
+<!--   select( protein_id) %>%  -->
+<!--   distinct()  -->
 
-ggarrange(figure_s2e, 
-          labels = "E",
-          font.label = list( size = 20))
-```
+<!-- complex_genes_annotated %>%  -->
+<!--   filter( protein_id %in%  promscs_genes$protein_id) %>%  -->
+<!--   group_by(protein_id) %>%  -->
+<!--   #filter( n_distinct(`Complex Name`) > 2) %>%  -->
+<!--   mutate( mean_prot = mean(cor_gene_prot, na.rm=T), -->
+<!--           sd_prot = sqrt(var(cor_gene_prot, na.rm=T)), -->
+<!--           cv_prot = abs(sd_prot/mean_prot) , -->
+<!--           n_complex = n()) %>%  -->
+<!--   ungroup() %>%  -->
+<!--   filter(!is.na(sd_prot), n_complex > 2)-> shared_complex_prots -->
+
+
+<!-- shared_complex_prots %>%  -->
+<!--   #filter( !protein_id %in% low_cor_genes$protein_id ) %>%  -->
+<!--   mutate( size = ifelse( n_overlap > 3, "Complex membership >3","Complex membership = 3" )) %>%  -->
+<!--   group_by(mgi_symbol) %>% -->
+<!--   mutate(new_symbol = ifelse( protein_id =="ENSMUSP00000130611", "ACTB-208", -->
+<!--                               ifelse( protein_id == "ENSMUSP00000098066", "ACTB-201", toupper(mgi_symbol) ))) %>%  -->
+<!--   arrange( sd_prot) %>%  -->
+<!--   mutate( label = factor(new_symbol , levels = unique(new_symbol)) ) %>%  -->
+<!--   ggplot()+ -->
+<!--   aes( x = cor_gene_prot, -->
+<!--        y = reorder(label, -sd_prot), -->
+<!--       col = sd_prot -->
+<!--        )+ -->
+<!--   geom_point( size = 4, alpha = 1)+ -->
+<!--   # geom_beeswarm( size = 3, alpha=1, groupOnX = F)+ -->
+<!--   # geom_boxplot( alpha =0.8, -->
+<!--   #               outlier.colour = "darkgoldenrod1", -->
+<!--   #               outlier.size = 3)+ -->
+<!--   theme_pubclean(base_size = 16)+ -->
+<!--   ylab("")+ -->
+<!--   xlab("Median correlation per gene per complex")+ -->
+<!--   scale_color_viridis(option = "magma", direction = 1)+ -->
+<!--   labs(col="Standard deviation")+ -->
+<!--   theme(legend.text = element_text(angle=45))+ -->
+<!--   facet_wrap(~size, scales="free_y") -> figure_s2e -->
+
+<!-- ggarrange(figure_s2e,  -->
+<!--           labels = "E", -->
+<!--           font.label = list( size = 20)) -->
+<!-- ``` -->
 
 
 
