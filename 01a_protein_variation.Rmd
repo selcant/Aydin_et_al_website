@@ -59,6 +59,7 @@ library(readxl)
 library(tidyverse)
 select <- dplyr::select # I am adding this explicitly
 rename <- dplyr::rename # I am adding this explicitly
+library(downloadthis)
 # setting path
 library(here)
 # get functions
@@ -682,6 +683,21 @@ regionDB = loadRegionDB(here("_data/LOLA/nm/t1/resources/regions/LOLACore/mm10/"
 
 ```
 
+
+```{r save_RData_for_figshare, echo=FALSE, eval=FALSE}
+
+# protein data + mapping stuff
+# expr.esc_prot, exprZ.esc_prot, all.prots, covar.esc_prot, covarTiday.esc_prot, probs.esc_prot, kinship.esc_prot, gmap, pmap
+
+
+# rna, atac data (shared) and mapping stuff
+# shared for MOFA
+# 
+
+
+```
+
+
 <br> <br>
 
 ### Figure 1A: Overview of data sets
@@ -734,7 +750,7 @@ Table containing normalized and filtered protein abundances (n = 7,432) across i
 # xfun::embed_file(here("Table_S1.xlsx"))
 
 download_file(
-  path = system.file(here("Table_S1.xlsx"), package = "downloadthis"),
+  path =  here("Table_S1.xlsx"),
   output_name = "Table_S1",
   button_label = "Download Table_S1.xlsx",
   button_type = "primary",
@@ -942,7 +958,7 @@ g.prot.not.detected$result %>%
 # xfun::embed_file(here("Table_S2.xlsx"))
 
 download_file(
-  path = system.file(here("Table_S2.xlsx"), package = "downloadthis"),
+  path = here("Table_S2.xlsx"),
   output_name = "Table_S2",
   button_label = "Download Table_S2.xlsx",
   button_type = "primary",
@@ -1666,7 +1682,7 @@ signif_results_tukey_rna %>%
 # xfun::embed_file(here("Table_S3.xlsx"))
 
 download_file(
-  path = system.file(here("Table_S3.xlsx"), package = "downloadthis"),
+  path = here("Table_S3.xlsx"),
   output_name = "Table_S3",
   button_label = "Download Table_S3.xlsx",
   button_type = "primary",
