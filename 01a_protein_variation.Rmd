@@ -53,6 +53,9 @@ library(pcaMethods) # pca
 library(Hmisc) # rcorr
 # library(WGCNA)
 library(gprofiler2)
+# set gprofiler version
+set_base_url("http://biit.cs.ut.ee/gprofiler_archive3/e106_eg53_p16/")
+
 # library(sva)
 library(WebGestaltR)
 library(readxl)
@@ -686,14 +689,141 @@ regionDB = loadRegionDB(here("_data/LOLA/nm/t1/resources/regions/LOLACore/mm10/"
 
 ```{r save_RData_for_figshare, echo=FALSE, eval=FALSE}
 
-# protein data + mapping stuff
-# expr.esc_prot, exprZ.esc_prot, all.prots, covar.esc_prot, covarTiday.esc_prot, probs.esc_prot, kinship.esc_prot, gmap, pmap
+# 1.	Proteomics data: DO_mESC_proteomics.RData file contains the following objects.
+# •	expr.esc_prot
+# •	exprZ.esc_prot
+# •	all.prots
+# •	probs.esc_prot
+# •	covar.esc_prot
+# •	covarTidy.esc_prot
+# •	kinship_loco.esc_prot
+# •	pmap, gmap
+
+save( file = here("DO_mECS_proteomics.RData"),
+      expr.esc_prot,
+      exprZ.esc_prot, 
+      all.prots,
+      probs.esc_prot,
+      covar.esc_prot,
+      covarTidy.esc_prot,
+      kinship_loco.esc_prot,
+      pmap,
+      gmap)
+
+# 2.	pQTL data: DO_mESC_pQTL.RData file contains the following objects.
+# •	do_mesc_pqtl_scans
+# •	do_mesc_pqtl_prot_meds
+# •	do_mesc_pqtl_rna_meds
+# •	do_mesc_pqtl_perms
+# need to load the scans and rename
+load("/projects/munger-lab/projects/DO_mESC/proteomics/pqtl_mapping_SA/DO195_mESC_pQTL_scans_noPoly_v2.RData") # esc.prot.scans
+do_mesc_pqtl_scans <- esc.prot.scans
+rm(esc.prot.scans)
+do_mesc_pqtl_prot_meds <- pqtl_prot_meds
+do_mesc_pqtl_rna_meds  <- pqtl_rna_meds
+# need to load the permutation results too
+# load and only keep the alpha = .05 results
+load(here("/projects/munger-lab/projects/DO_mESC/proteomics/pqtl_mapping_SA/pQTL_perms_01_005.RData"))
+do_mesc_pqtl_perms <- perms %>% 
+  filter(alpha == 0.05)
+rm(perms)
+
+save(
+  do_mesc_pqtl_scans,
+  do_mesc_pqtl_prot_meds,
+  do_mesc_pqtl_rna_meds,
+  do_mesc_pqtl_perms,
+  file = here("DO_mESC_pQTL.RData")
+)
+
+# 3.	Data used in MOFA and integration results: DO_mESC_MOFA.RData
+# •	all_df_shared
+# •	all_df_shared_model
+# •	all_df_shared_model_filtered
+# •	shared_samples_metadata
+# •	all_df_shared_factors
+# •	all_df_shared_weights
+# •	all_df_shared_factors_mat
+# •	shared.probs
+# •	shared.kinship
+# •	shared.covar
+# •	gmap, pmap
 
 
-# rna, atac data (shared) and mapping stuff
-# shared for MOFA
-# 
+library(MOFA2)
+# load data from the MOFA project
+load("/projects/munger-lab/projects/DO_mESC/proteomics/pQTL_website/_data/MOFA_data_prep_04112022.RData") # has all the data frames
+rm(all_df, 
+   all_df_top5k, all_df_top5k_shared,
+   trans_df_top15k, trans_df_top15k_shared,
+   herit_df_shared)
 
+# load MOFA model + process it
+# create the MOFA object
+all_df_shared_MOFAobject <- create_mofa(all_df_shared)
+
+# Load in model results generated using _src/MOFA_train_model_CPU.r
+all_df_shared_model <- load_model(here("../pQTL_website/_data/all_df_shared_30factors_2022-04-11.hdf5"), remove_inactive_factors = F)
+# Warning message:
+# In .quality_control(object, verbose = verbose) :
+#   Factor(s) 3 are strongly correlated with the total number of expressed features for at least one of your omics. Such factors appear when there are differences in the total 'levels' between your samples, *sometimes* because of poor normalisation in the preprocessing steps.
+
+# Removing Factor 3 that shows high correlation to the total # of expressed features.
+all_df_shared_model <- subset_factors( all_df_shared_model, factors = c(1:2, 4:30))
+
+# Removing Factors that don't explain at least 1% of variation in a data set. 
+all_df_shared_factor_var <- all_df_shared_model@cache$variance_explained$r2_per_factor %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  filter(single_group.Chromatin > 1 |
+           single_group.Protein > 1 |
+           single_group.Transcript > 1) %>%
+  column_to_rownames()
+all_df_shared_model_filtered <- subset_factors(all_df_shared_model,
+                                        factors = as.numeric(gsub("Factor","",rownames(all_df_shared_factor_var))))
+
+# updating the sexes in the metadata to use Female/Male instead of 0s and 1s.
+merged_metadata <- merged.covar2 %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  select(-lifr) %>%
+  rename("sample"="rowname")
+shared_samples_metadata <- all_df_shared_model_filtered@samples_metadata %>%
+  left_join(.,merged_metadata) %>%
+  mutate(sex = ifelse(sex ==0,"Female", "Male"))
+samples_metadata(all_df_shared_model_filtered) <- shared_samples_metadata
+
+# Get Factor weights
+all_df_shared_factors <- get_factors(all_df_shared_model_filtered,
+  factors = "all",
+  as.data.frame = T
+)
+# Add sample details and convert to matrix with Factors in rows and samples in columns.
+all_df_shared_factors_mat <- all_df_shared_factors %>%
+  pivot_wider(id_cols = "sample", names_from = "factor", values_from = "value") %>%
+  left_join(., select(threeway.shared.samples, top_muga, sampleid), by =c("sample"="top_muga")) %>%
+  column_to_rownames("sample") %>%
+  select(-sampleid) %>%
+  as.matrix()
+
+# Get feature weights
+all_df_shared_weights <- get_weights(all_df_shared_model_filtered, as.data.frame = TRUE, scale = TRUE)
+
+# saving
+save(
+  all_df_shared,
+  all_df_shared_model,
+  all_df_shared_model_filtered,
+  shared_samples_metadata,
+  all_df_shared_factors,
+  all_df_shared_weights,
+  all_df_shared_factors_mat,
+  shared.probs,
+  shared.kinship,
+  shared.covar,
+  gmap, pmap,
+  file = here("DO_mESC_MOFA.RData")
+)
 
 ```
 
@@ -968,6 +1098,7 @@ download_file(
 )
 
 ```
+
 
 <br>
 
