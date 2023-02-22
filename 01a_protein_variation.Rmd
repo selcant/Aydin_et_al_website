@@ -697,28 +697,57 @@ regionDB = loadRegionDB(here("_data/LOLA/nm/t1/resources/regions/LOLACore/mm10/"
 # •	covar.esc_prot
 # •	covarTidy.esc_prot
 # •	kinship_loco.esc_prot
-# •	pmap, gmap
+# •	pmap, gmap, map_dat2
 
-save( file = here("DO_mECS_proteomics.RData"),
+covarTidy.esc_prot <- left_join(covarTidy.esc_prot, covar.lifr, by = c("top_muga"="rowname"))
+
+save( file = here("_figshare","DO_mESC_proteomics.RData"),
       expr.esc_prot,
       exprZ.esc_prot, 
-      all.prots,
+      all.prots, 
+      shared.genes, 
+      shared.samples,
       probs.esc_prot,
       covar.esc_prot,
       covarTidy.esc_prot,
       kinship_loco.esc_prot,
       pmap,
-      gmap)
+      gmap,
+      map_dat2)
 
-# 2.	pQTL data: DO_mESC_pQTL.RData file contains the following objects.
-# •	do_mesc_pqtl_scans
-# •	do_mesc_pqtl_prot_meds
-# •	do_mesc_pqtl_rna_meds
-# •	do_mesc_pqtl_perms
-# need to load the scans and rename
+# 2.	Complexes: The list of protein complexes and the genes within them as retrieved from Ori et al., 20161.
+save( complexes,
+      file = here("_figshare","Complex_gene_list.RData")
+)
+
+# 3.	Data used in covariation analysis: DO_mESC_covar.RData file contains the following objects:
+# •	expr.esc_rna
+# •	all.genes
+# •	all.tfs
+# •	counts.norm2
+# •	threeway.shared.samples
+# •	threeway.shared.genes
+# •	atac.peak.annots
+
+save(
+  expr.esc_rna,
+  all.genes, 
+  all.tfs,
+  counts.norm2,
+  threeway.shared.genes,
+  threeway.shared.samples,
+  atac.peak.annots,
+  file = here("_figshare","DO_mESC_covar.RData")
+)
+
+# 4.	pQTL data: DO_mESC_pQTL.RData file contains the following objects.
+# •	esc.prot.scans – pQTL scans for all 7,432 proteins.
+# •	esc.rna.scans
+# •	pqtl_prot_meds – Mediation results of pQTL peaks using protein abundances.
+# •	pqtl_rna_meds – Mediation results of pQTL peaks using transcript abundances.
+# •	do_mesc_pqtl_perms – Permutation results with alpha = 0.05 for all 7,432 proteins.
 load("/projects/munger-lab/projects/DO_mESC/proteomics/pqtl_mapping_SA/DO195_mESC_pQTL_scans_noPoly_v2.RData") # esc.prot.scans
-do_mesc_pqtl_scans <- esc.prot.scans
-rm(esc.prot.scans)
+load("/projects/munger-lab/projects/DO_mESC/rna_seq/qtl_mapping/total_gene_expression/eqtl_grid69k_pe/DO185_mESC_paired_eQTL_scans.RData") # esc.rna.scans
 do_mesc_pqtl_prot_meds <- pqtl_prot_meds
 do_mesc_pqtl_rna_meds  <- pqtl_rna_meds
 # need to load the permutation results too
@@ -729,25 +758,40 @@ do_mesc_pqtl_perms <- perms %>%
 rm(perms)
 
 save(
-  do_mesc_pqtl_scans,
-  do_mesc_pqtl_prot_meds,
-  do_mesc_pqtl_rna_meds,
+  esc.prot.scans,
+  esc.rna.scans,
+  pqtl_prot_meds,
+  pqtl_rna_meds,
   do_mesc_pqtl_perms,
-  file = here("DO_mESC_pQTL.RData")
+  file = here("_figshare","DO_mESC_pQTL.RData")
 )
 
-# 3.	Data used in MOFA and integration results: DO_mESC_MOFA.RData
+# 5.	Overlap across QTL peaks data: 
+# •	peaks.esc_prot
+# •	peaks.esc.overlap.wEffs
+# •	exprZ.esc_rna, probs.esc_rna, covar.esc_rna, kinship_loco.esc_rna
+# •	counts.normZ, probs.esc_atac, covar.esc_atac, kinship_loco.esc_atac
+# •	threeway.shared.samples
+# •	threeway.shared.genes
+save(
+  peaks.esc_prot,
+  peaks.esc.overlap.wEffs,
+  exprZ.esc_rna, probs.esc_rna, covar.esc_rna, kinship_loco.esc_rna,
+  counts.normZ, probs.esc_atac, covar.esc_atac, kinship_loco.esc_atac,
+  threeway.shared.samples,
+  threeway.shared.genes,
+  file = here("_figshare","DO_mESC_QTL_peaks.RData")
+)
+
+# 6.	Data used in MOFA and integration results: DO_mESC_MOFA.RData
 # •	all_df_shared
 # •	all_df_shared_model
-# •	all_df_shared_model_filtered
 # •	shared_samples_metadata
-# •	all_df_shared_factors
-# •	all_df_shared_weights
-# •	all_df_shared_factors_mat
 # •	shared.probs
 # •	shared.kinship
 # •	shared.covar
-# •	gmap, pmap
+
+# •	gmap, pmap, map_dat2
 
 
 library(MOFA2)
@@ -809,20 +853,28 @@ all_df_shared_factors_mat <- all_df_shared_factors %>%
 # Get feature weights
 all_df_shared_weights <- get_weights(all_df_shared_model_filtered, as.data.frame = TRUE, scale = TRUE)
 
+# load in permutation results
+load(here("../pQTL_website/_data/MOFA_all_df_thres_rankZ.RData"))
+
+# load in combined lola results
+load( here("../pQTL_website/_data/","MOFA_Factor_LOLA_results.RData")) # lola_combined
+
 # saving
 save(
   all_df_shared,
   all_df_shared_model,
-  all_df_shared_model_filtered,
+  #all_df_shared_model_filtered,
   shared_samples_metadata,
-  all_df_shared_factors,
-  all_df_shared_weights,
-  all_df_shared_factors_mat,
+  #all_df_shared_factors,
+  #all_df_shared_weights,
+  #all_df_shared_factors_mat,
   shared.probs,
   shared.kinship,
   shared.covar,
-  gmap, pmap,
-  file = here("DO_mESC_MOFA.RData")
+  gmap, pmap, map_dat2,
+  all_df_shared_thres,
+  lola_combined,
+  file = here("_figshare","DO_mESC_MOFA.RData")
 )
 
 ```
