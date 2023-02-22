@@ -127,7 +127,7 @@ pqtl_plot
 <br>
 <br>
 
-Data used in making the interactive plot above can be downloaded below.
+Data used in making the plot above can be downloaded below.
 
 ```{r Figure_4A_data, fig.cap="Significant pQTL details plotted in Figure 4A.", warning=FALSE, message=FALSE}
 
@@ -336,13 +336,17 @@ pQTL_peak_significant
 
 ```{r Figure_4B_prep}
 
-shared.qtl <- peaks.shared.genes %>% 
+shared.qtl <- peaks.esc.overlap.wEffs %>% 
   filter(match %in% c("shared","shared_eQTL_pQTL") & 
          !(lod.esc_rna < 7.5 & lod.esc_prot < 7.5)) %>% 
   select( ensembl_gene_id, protein_id, mgi_symbol, peak_chr, interp_bp_peak.esc_rna, interp_bp_peak.esc_prot, lod.esc_prot, lod.esc_rna) %>% 
   distinct()
 
-shared.qtl.effects <- peaks.merged.blup %>%
+shared.qtl.effects <- peaks.esc.overlap.wEffs %>%
+  select( ensembl_gene_id, protein_id, mgi_symbol, peak_chr, interp_bp_peak.esc_rna, interp_bp_peak.esc_prot, lod.esc_prot, lod.esc_rna,
+          paste0(LETTERS[1:8],".esc_prot"), paste0(LETTERS[1:8],".esc_rna"),
+          local.esc_rna, local.esc_prot
+          ) %>% 
   right_join(., shared.qtl) %>%
   mutate(local = ifelse((local.esc_rna == TRUE | local.esc_prot == T), "local", "distant")) %>%
   filter(!is.na(A.esc_rna), !is.na(A.esc_prot)) %>%
@@ -441,19 +445,13 @@ Figure4B_data %>%
 
 
 # BSPRY plot
-bspry_qtl <- peaks.esc.overlap2 %>% 
-  filter( lod.esc_prot >7.5, mgi_symbol =="Bspry")
+bspry_qtl <- peaks.esc.overlap.wEffs %>% 
+  filter( lod.esc_prot >7.5, 
+          lod.esc_rna > 7.5,
+          lod.esc_atac >7.5,
+          mgi_symbol =="Bspry")
 
 # get allele effects
-peaks.esc.overlap.wEffs %>% 
-  filter( peak_id == bspry_qtl$peak_id , 
-          peak_chr == bspry_qtl$peak_chr) %>% 
-  select( mgi_symbol, 
-          paste0(LETTERS[1:8], ".esc_atac"),
-          paste0(LETTERS[1:8], ".esc_rna"),
-          paste0(LETTERS[1:8], ".esc_prot")
-  ) -> bspry_effects
-
 peaks.esc.overlap.wEffs %>% 
   filter( peak_id == bspry_qtl$peak_id , 
           peak_chr == bspry_qtl$peak_chr) %>% 
@@ -492,7 +490,7 @@ bspry_caqtl %>%
     bspry_pqtl %>% as.data.frame() %>% rename( pqtl = pheno1)
   ) -> bspry_qtl_scans
 
-tfcp2l1_qtl <- peaks.esc.overlap2 %>% 
+tfcp2l1_qtl <- peaks.esc.overlap.wEffs %>% 
   filter( lod.esc_prot >7.5, mgi_symbol =="Tfcp2l1", match =="shared")
 
 # Get allele effects
@@ -790,8 +788,8 @@ window_counts <- window_counts %>%
   mutate(midpoint = (pos_cM_end + pos_cM_start) / 2, 4)
 
 x <- select(window_counts, chrom, starts_with("pos_bp"), starts_with("distant")) %>%
-  filter( distant_esc_prot > quantile(distant_esc_prot,0.995) ,
-          distant_esc_prot_sugg > quantile(distant_esc_prot_sugg,0.995) ,)
+  filter( distant_esc_prot > quantile(distant_esc_prot,0.995) |
+          distant_esc_prot_sugg > quantile(distant_esc_prot_sugg,0.995) )
 
 bands.esc.prot <- x %>%
   rename(start = pos_bp_start, end = pos_bp_end) %>%
@@ -1229,7 +1227,7 @@ ribo_qtl_plot
 
 ```{r Figure_4E_prep}
 
-rpa_qtl <- peaks.esc.overlap2 %>% 
+rpa_qtl <- peaks.esc.overlap.wEffs %>% 
   filter( lod.esc_prot >7.5, mgi_symbol %in% c("Rpa1","Rpa2","Rpa3"), match%in% c("esc_prot","shared"))
 
 # Effects plot
