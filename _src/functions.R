@@ -2,7 +2,7 @@
 
 chroms <- c(as.character(1:19), "X")
 interp_bp <- function(df) {
-  
+  chroms <- c(as.character(1:19), "X")
   df <- arrange(df, peak_chr, peak_cM)
   peak_gpos <- select(df, peak_chr, peak_cM)
   chr <- peak_gpos$peak_chr
