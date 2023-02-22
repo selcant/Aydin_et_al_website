@@ -593,7 +593,7 @@ colnames(shared_rna_mat) <- paste0(colnames(shared_rna_mat),"_rna")
 
 prot_rna_sample_cor <- rcorr( x = shared_prot_mat,
                          y = shared_rna_mat,
-                         type = "spearman")
+                         type = "pearson")
 
 
 prot_rna_sample_cor_df <- as_tibble( prot_rna_sample_cor$r[colnames(shared_prot_mat), colnames(shared_rna_mat)],
@@ -822,7 +822,7 @@ ora_rev_var_prots2$result %>%
 # sample_cor <- c()
 # for( i in 1:1000){
 #   # randomizing the sample names 1000 times and getting correlations
-#   
+# 
 #   shared_prot_mat <-  t(exprZ.esc_prot[shared.samples, shared.prot.names$protein_id])
 #   # randomize the sample names
 #   colnames(shared_prot_mat) <- paste0( sample(colnames(shared_prot_mat), ncol(shared_prot_mat)),"_protein")
@@ -833,22 +833,22 @@ ora_rev_var_prots2$result %>%
 # 
 #   measure.cor.df <- rcorr( x = shared_prot_mat,
 #                          y = shared_rna_mat,
-#                          type = "spearman")
-#   
+#                          type = "pearson")
+# 
 #   sample_cor[[i]] <- as_tibble( measure.cor.df$r[colnames(shared_prot_mat), colnames(shared_rna_mat)],
 #                             rownames = "protein_sample") %>%
 #   pivot_longer( colnames(shared_rna_mat), names_to = "rna_sample", values_to = "r") %>%
 #   inner_join( (as_tibble( measure.cor.df$P[colnames(shared_prot_mat), colnames(shared_rna_mat)],
 #                             rownames = "protein_sample") %>%
-#       pivot_longer( colnames(shared_rna_mat), names_to = "rna_sample", values_to = "p_val") ) ) %>% 
+#       pivot_longer( colnames(shared_rna_mat), names_to = "rna_sample", values_to = "p_val") ) ) %>%
 #     mutate( n = i)
 # 
 # }
 # 
-# save(sample_cor, file = here("_data","rna_prot_sample_cor_perm.RData"))
+# save(sample_cor, file = here("_data","rna_prot_sample_cor_perm_pearson.RData"))
 
 
-load(here("../pQTL_website/_data","rna_prot_sample_cor_perm.RData"))
+load(here("../pQTL_website/_data","rna_prot_sample_cor_perm_pearson.RData"))
 
 sample_cor %>% 
   enframe() %>% 
